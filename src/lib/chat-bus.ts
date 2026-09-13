@@ -1,0 +1,25 @@
+/**
+ * Tiny event bus so reference pages can open the existing ChatPanel
+ * pre-scoped to a context (a student, the directory, …) without new routes.
+ */
+export interface ChatOpenRequest {
+  /** Short context label shown under the panel header. */
+  context: string;
+  /** Optional question pre-filled in the composer. */
+  question?: string;
+}
+
+type Listener = (req: ChatOpenRequest) => void;
+
+const listeners = new Set<Listener>();
+
+export function openChat(req: ChatOpenRequest) {
+  listeners.forEach((l) => l(req));
+}
+
+export function subscribeToChatOpen(listener: Listener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}

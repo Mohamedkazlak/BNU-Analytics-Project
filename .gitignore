@@ -1,0 +1,20 @@
+# Dependencies
+node_modules
+
+# Build and generated output
+dist
+.output
+.nitro
+.tanstack
+.wrangler
+.vite
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.local
+
+# OS / editor
+.DS_Store
+.idea
