@@ -28,7 +28,7 @@ import type {
 } from "./types";
 import { getActiveDemoUserId } from "./role-guards";
 
-const USE_FASTAPI_BACKEND = false; // Toggle to true once the FastAPI backend is running
+const USE_FASTAPI_BACKEND = true; // Toggle to true once the FastAPI backend is running
 const BACKEND_URL = "http://localhost:8000";
 
 async function fetchFromBackend<T>(endpoint: string): Promise<T> {
