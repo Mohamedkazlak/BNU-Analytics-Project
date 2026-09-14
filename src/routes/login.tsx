@@ -72,6 +72,11 @@ function Login() {
     <div className="flex h-screen w-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5">
         <div className="mb-8 text-center">
+          <img
+            src="/brand-logo.png"
+            alt="BNU logo"
+            className="mx-auto mb-4 h-14 w-auto object-contain"
+          />
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
             Sign in
           </h1>

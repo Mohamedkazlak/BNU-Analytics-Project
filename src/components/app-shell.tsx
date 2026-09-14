@@ -11,9 +11,10 @@ import {
   useRole,
 } from "./role-context";
 import type { DemoUser } from "@/lib/types";
-import bnuMark from "@/assets/bnu-mark.png.asset.json";
 import { clearAuthToken } from "@/lib/auth-token";
 import { rolesAllowedForPath } from "@/lib/role-guards";
+
+const BRAND_LOGO = "/brand-logo.png";
 
 function AffiliationParts({ user }: { user: DemoUser }) {
   const affiliation = affiliationForScope(user.scopeId);
@@ -65,8 +66,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-1 border-r border-white/70 bg-white/55 px-5 py-6 backdrop-blur-2xl md:flex">
           <div className="mb-6 flex items-center gap-2.5">
             <img
-              className="size-10 shrink-0 object-contain"
-              src={bnuMark.url}
+              className="h-11 w-auto shrink-0 object-contain"
+              src={BRAND_LOGO}
               alt="BNU logo"
             />
             <div>
@@ -131,6 +132,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         <main className="min-w-0 flex-1 px-6 py-6 lg:px-10">
+          <div className="mb-4 flex items-center gap-2.5 md:hidden">
+            <img
+              className="h-9 w-auto shrink-0 object-contain"
+              src={BRAND_LOGO}
+              alt="BNU logo"
+            />
+            <div>
+              <div className="font-display text-sm font-bold leading-none">
+                BNU
+              </div>
+              <div className="mt-0.5 text-[10px] font-semibold text-ink-soft">
+                AI-driven Dashboard
+              </div>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.14em]">
