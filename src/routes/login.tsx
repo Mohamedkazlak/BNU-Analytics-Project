@@ -4,6 +4,65 @@ import { roleRoutes, getActiveDemoRole } from "../lib/role-guards";
 import { setAuthToken } from "../lib/auth-token";
 import { BACKEND_URL } from "../lib/api";
 
+const DEMO_ACCOUNTS = [
+  {
+    id: "u-president",
+    title: "University President",
+    route: "/management",
+    badge: "bg-blue-50 text-blue-700 ring-blue-700/10",
+    description: "Sees everything about everyone",
+  },
+  {
+    id: "u-vp-aa",
+    title: "VP for Academic Affairs",
+    route: "/management",
+    badge: "bg-blue-50 text-blue-700 ring-blue-700/10",
+    description: "Sees everything about everyone",
+  },
+  {
+    id: "u-dean-eng",
+    title: "Sector Dean",
+    route: "/management",
+    badge: "bg-blue-50 text-blue-700 ring-blue-700/10",
+    description: "Sees everything about colleges he supervises",
+  },
+  {
+    id: "u-pd-cs",
+    title: "Program Director",
+    route: "/program-director",
+    badge: "bg-indigo-50 text-indigo-700 ring-indigo-700/10",
+    description: "Sees everything about his college",
+  },
+  {
+    id: "u-aa-cs",
+    title: "Academic Affairs",
+    route: "/academic-affairs",
+    badge: "bg-purple-50 text-purple-700 ring-purple-700/10",
+    description: "Sees everything about students of his college",
+  },
+  {
+    id: "u-prof-cs",
+    title: "Professor",
+    route: "/professor",
+    badge: "bg-pink-50 text-pink-700 ring-pink-700/10",
+    description: "Sees everything about his curriculums",
+  },
+  {
+    id: "u-it-integrity",
+    title: "IT / Academic Integrity",
+    route: "/integrity",
+    badge: "bg-red-50 text-red-700 ring-red-700/10",
+    description: "Sees live exam monitoring & flagged cases",
+  },
+  {
+    id: "u-student",
+    title: "Student",
+    route: "/my-progress",
+    badge: "bg-green-50 text-green-700 ring-green-700/10",
+    description: "Sees his own performance & recommendations",
+  },
+] as const;
+
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
     if (typeof window === "undefined") return;
@@ -69,178 +128,84 @@ function Login() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5">
-        <div className="mb-8 text-center">
-          <img
-            src="/brand-logo.png"
-            alt="BNU logo"
-            className="mx-auto mb-4 h-14 w-auto object-contain"
-          />
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Sign in
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">BNU Analytics Dashboard</p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-900">
-              User ID
-            </label>
-            <input
-              type="text"
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-              className="mt-2 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-              placeholder="e.g. u-president"
-            />
+    <div className="flex min-h-dvh w-full items-center justify-center bg-gray-50 p-4 sm:p-6">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 sm:max-h-[calc(100dvh-3rem)]">
+        <div className="grid min-h-0 w-full grid-cols-1 overflow-y-auto md:grid-cols-[minmax(16rem,20rem)_1fr] md:overflow-hidden">
+          <div className="flex flex-col justify-center p-6 sm:p-8 md:border-r md:border-gray-200">
+            <div className="mb-6 text-center">
+              <img
+                src="/brand-logo.png"
+                alt="BNU logo"
+                className="mx-auto mb-4 h-14 w-auto object-contain"
+              />
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                Sign in
+              </h1>
+              <p className="mt-2 text-sm text-gray-600">
+                BNU Analytics Dashboard
+              </p>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-900">
+                  User ID
+                </label>
+                <input
+                  type="text"
+                  value={id}
+                  onChange={(e) => setId(e.target.value)}
+                  className="mt-2 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  placeholder="e.g. u-president"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-2 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                />
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
+              >
+                {loading ? "Signing in..." : "Sign in"}
+              </button>
+            </form>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-900">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-2 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            />
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
 
-        <div className="mt-8 border-t border-gray-200 pt-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">
-            Demo Accounts
-          </h3>
-          <div className="space-y-3 text-xs text-gray-600">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-semibold text-gray-900">u-president</span>
-                <p>University President</p>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                  /management
-                </span>
-                <p className="mt-1 text-gray-500">
-                  Sees everything about everyone
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-semibold text-gray-900">u-vp-aa</span>
-                <p>VP for Academic Affairs</p>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                  /management
-                </span>
-                <p className="mt-1 text-gray-500">
-                  Sees everything about everyone
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-semibold text-gray-900">u-dean-eng</span>
-                <p>Sector Dean</p>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                  /management
-                </span>
-                <p className="mt-1 text-gray-500">
-                  Sees everything about colleges he supervises
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-semibold text-gray-900">u-pd-cs</span>
-                <p>Program Director</p>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10">
-                  /program-director
-                </span>
-                <p className="mt-1 text-gray-500">
-                  Sees everything about his college
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-semibold text-gray-900">u-aa-cs</span>
-                <p>Academic Affairs</p>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
-                  /academic-affairs
-                </span>
-                <p className="mt-1 text-gray-500">
-                  Sees everything about students of his college
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-semibold text-gray-900">u-prof-cs</span>
-                <p>Professor</p>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center rounded-md bg-pink-50 px-2 py-1 text-xs font-medium text-pink-700 ring-1 ring-inset ring-pink-700/10">
-                  /professor
-                </span>
-                <p className="mt-1 text-gray-500">
-                  Sees everything about his curriculums
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-semibold text-gray-900">
-                  u-it-integrity
-                </span>
-                <p>IT / Academic Integrity</p>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-700/10">
-                  /integrity
-                </span>
-                <p className="mt-1 text-gray-500">
-                  Sees live exam monitoring & flagged cases
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-semibold text-gray-900">u-student</span>
-                <p>Student</p>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-700/10">
-                  /my-progress
-                </span>
-                <p className="mt-1 text-gray-500">
-                  Sees his own performance & recommendations
-                </p>
-              </div>
+          <div className="flex min-h-0 flex-col border-t border-gray-200 p-5 sm:p-6 md:border-t-0 md:overflow-y-auto">
+            <h3 className="mb-3 text-sm font-medium text-gray-900">
+              Demo Accounts
+            </h3>
+            <div className="space-y-2 text-xs text-gray-600">
+              {DEMO_ACCOUNTS.map((account) => (
+                <div
+                  key={account.id}
+                  className="flex items-start justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <span className="font-semibold text-gray-900">
+                      {account.id}
+                    </span>
+                    <p>{account.title}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span
+                      className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${account.badge}`}
+                    >
+                      {account.route}
+                    </span>
+                    <p className="mt-1 text-gray-500">{account.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
