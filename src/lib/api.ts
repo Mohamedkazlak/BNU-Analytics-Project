@@ -225,6 +225,12 @@ export function getManagementOverview(
 export function getStudentPerformance(
   scope?: ViewerScope,
 ): Promise<StudentPerformanceReport> {
+  if (USE_FASTAPI_BACKEND) {
+    return fetchFromBackend<StudentPerformanceReport>(
+      "/api/student-performance",
+    );
+  }
+
   return request(() => {
     const { examList, studentList, takenList } = view(scope);
     const nameOf = (id: string) =>
@@ -338,6 +344,10 @@ export function getStudentPerformance(
 export function getItemAnalysis(
   scope?: ViewerScope,
 ): Promise<ItemAnalysisReport> {
+  if (USE_FASTAPI_BACKEND) {
+    return fetchFromBackend<ItemAnalysisReport>("/api/item-analysis");
+  }
+
   return request(() => {
     const { v } = view(scope);
     const rows = [...questionsInScope(v)].sort(
@@ -356,6 +366,10 @@ export function getItemAnalysis(
 export function getIntegrityReport(
   scope?: ViewerScope,
 ): Promise<IntegrityReport> {
+  if (USE_FASTAPI_BACKEND) {
+    return fetchFromBackend<IntegrityReport>("/api/integrity-report");
+  }
+
   return request(() => {
     const { examList, studentList, takenList } = view(scope);
     const rows = takenList.slice(0, 45).map((a, i) => {
@@ -412,6 +426,10 @@ export function getIntegrityReport(
 export function getParticipationReport(
   scope?: ViewerScope,
 ): Promise<ParticipationReport> {
+  if (USE_FASTAPI_BACKEND) {
+    return fetchFromBackend<ParticipationReport>("/api/participation-report");
+  }
+
   return request(() => {
     const { courseList, examList, attemptList, takenList } = view(scope);
     const attemptsPerExam = examList.map((exam) => {
@@ -483,6 +501,10 @@ export function getParticipationReport(
 export function getCoursePerformance(
   scope?: ViewerScope,
 ): Promise<CoursePerformanceReport> {
+  if (USE_FASTAPI_BACKEND) {
+    return fetchFromBackend<CoursePerformanceReport>("/api/course-performance");
+  }
+
   return request(() => {
     const { courseList, examList, studentList, takenList } = view(scope);
     const averageByCourse = courseList.map((course) => {
@@ -536,6 +558,10 @@ export function getCoursePerformance(
 export function getRealTimeStruggling(
   scope?: ViewerScope,
 ): Promise<RealTimeReport> {
+  if (USE_FASTAPI_BACKEND) {
+    return fetchFromBackend<RealTimeReport>("/api/real-time-struggling");
+  }
+
   return request(() => {
     const { v, courseList, examList, studentList, attemptList, takenList } =
       view(scope);
@@ -660,6 +686,10 @@ const overallAverageOf = (studentId: string) =>
 export function getStudentDirectory(
   scope?: ViewerScope,
 ): Promise<StudentDirectoryRow[]> {
+  if (USE_FASTAPI_BACKEND) {
+    return fetchFromBackend<StudentDirectoryRow[]>("/api/student-directory");
+  }
+
   return request(() => {
     const { studentList } = view(scope);
     return studentList
