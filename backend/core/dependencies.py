@@ -16,6 +16,7 @@ async def get_current_user(request: Request, token: HTTPAuthorizationCredentials
         role=payload.get("role"),
         scope_id=payload.get("scope_id"),
         person_id=payload.get("person_id"),
+        student_id=payload.get("student_id"),
     )
     request.state.user = user_ctx
     return user_ctx

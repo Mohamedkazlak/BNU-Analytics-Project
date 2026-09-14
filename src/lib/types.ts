@@ -107,8 +107,9 @@ export interface Attempt {
 export interface Kpi {
   label: string;
   value: string;
-  delta: string;
-  direction: "up" | "down";
+  /** Omitted when there is no real prior-period value to compare against. */
+  delta?: string;
+  direction?: "up" | "down";
 }
 
 export interface ManagementOverview {

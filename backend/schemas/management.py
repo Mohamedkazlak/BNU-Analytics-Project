@@ -1,11 +1,14 @@
 from pydantic import BaseModel
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 class Kpi(BaseModel):
     label: str
     value: str
-    delta: str
-    direction: Literal["up", "down"]
+    # No prior-term data exists yet to compute a real trend (course_offerings
+    # only has current-term rows), so these are omitted rather than faked.
+    # Populate once a prior period is available to compare against.
+    delta: Optional[str] = None
+    direction: Optional[Literal["up", "down"]] = None
 
 class PassRateByCourse(BaseModel):
     course: str

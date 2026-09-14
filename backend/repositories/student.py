@@ -51,7 +51,7 @@ async def get_student_dashboard(ctx: UserContext, db: asyncpg.Connection) -> dic
     if exam_ids:
         avgs = await db.fetch(
             """
-            SELECT exam_id, AVG(score) as avg_score
+            SELECT exam_id, avg_score
             FROM get_exam_averages($1::text[])
             """,
             exam_ids
@@ -109,7 +109,7 @@ async def get_student_profile(student_id: str, ctx: UserContext, db: asyncpg.Con
     # 1. Verify access to student by querying v_students
     student = await db.fetchrow(
         """
-        SELECT id, name, program, section_name
+        SELECT id, name, program, section
         FROM v_students
         WHERE id = $1
         """,
@@ -156,7 +156,7 @@ async def get_student_profile(student_id: str, ctx: UserContext, db: asyncpg.Con
         "studentId": student["id"],
         "name": student["name"],
         "program": student["program"] or "Unknown",
-        "section": student["section_name"] or "A",
+        "section": student["section"] or "A",
         "cohortRank": 1,
         "cohortSize": 100,
         "overallAverage": overall_avg,

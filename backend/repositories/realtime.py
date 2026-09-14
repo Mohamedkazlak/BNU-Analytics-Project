@@ -42,7 +42,7 @@ async def get_real_time_struggling(ctx: UserContext, db: asyncpg.Connection):
 
     live = await db.fetch("""
         SELECT a.exam_id, a.exam_title, a.course_code, a.program, a.sector, a.status,
-               a.attempt_count, a.late_start, a.time_taken_min
+               a.attempt_count, a.late_start, a.time_taken_min, x.status AS exam_status
         FROM v_exam_attempts a
         JOIN exams x ON x.id = a.exam_id
         WHERE x.status IN ('in_progress', 'closing')
@@ -56,6 +56,7 @@ async def get_real_time_struggling(ctx: UserContext, db: asyncpg.Connection):
                 "course": r["course_code"],
                 "program": r["program"],
                 "sector": r["sector"],
+                "exam_status": r["exam_status"],
                 "rows": [],
             },
         )
@@ -82,7 +83,7 @@ async def get_real_time_struggling(ctx: UserContext, db: asyncpg.Connection):
                 "expected": len(v["rows"]),
                 "flagged": flagged,
                 "status": (
-                    "Closing" if any(r["status"] for r in v["rows"]) else "In progress"
+                    "Closing" if v["exam_status"] == "closing" else "In progress"
                 ),
             }
         )

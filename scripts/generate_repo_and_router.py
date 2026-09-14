@@ -1,3 +1,13 @@
+"""One-off code-generation script used while splitting main.py's inline
+endpoint bodies into repositories/ + routers/ modules.
+
+Not imported by the running app. Kept for reference only; if re-run, it must
+be executed with the working directory set to backend/ (it reads main.py and
+writes repositories/*.py + routers/*.py relative to cwd), e.g.:
+
+    cd backend && python ../scripts/generate_repo_and_router.py
+"""
+
 import os
 import re
 

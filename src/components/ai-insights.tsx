@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 import { aiConfig } from "@/lib/ai-config";
-import { demoSession, getInsight, getPrediction, type Insight, type Prediction, type RiskCase } from "@/lib/ai-insights";
+import { getInsight, getPrediction, type Insight, type Prediction, type RiskCase } from "@/lib/ai-insights";
 import { getRecommendations, type Recommendation } from "@/lib/ai-recommendations";
 import { useRole } from "./role-context";
 
@@ -206,14 +206,15 @@ interface Decision {
 
 /**
  * One combined read: headline finding, trajectory and ranked actions.
- * Every underlying loader still runs its own assertCanRead scope gate.
+ * Every loader below calls the backend, which derives role/scope from the
+ * verified JWT and re-applies its own permission gate server-side — the
+ * `role` here only controls which panels this client bothers to render.
  */
 async function getDecision(role: Role, traceId: string): Promise<Decision> {
-  const session = demoSession(role);
   const [insight, prediction, recommendations] = await Promise.all([
-    aiConfig.showInsights[role] ? getInsight(session) : Promise.resolve(null),
-    aiConfig.showPredictions[role] ? getPrediction(session) : Promise.resolve(null),
-    getRecommendations(session, traceId),
+    aiConfig.showInsights[role] ? getInsight() : Promise.resolve(null),
+    aiConfig.showPredictions[role] ? getPrediction() : Promise.resolve(null),
+    getRecommendations(traceId),
   ]);
   return { insight, prediction, recommendations: recommendations?.items ?? [] };
 }

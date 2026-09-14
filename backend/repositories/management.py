@@ -1,5 +1,4 @@
 import asyncpg
-import random
 from schemas.auth import UserContext
 
 
@@ -22,31 +21,15 @@ async def get_management_overview(ctx: UserContext, db: asyncpg.Connection) -> d
     pass_rate = (passed_attempts / taken_attempts * 100) if taken_attempts else 0
     completion = (taken_attempts / total_attempts * 100) if total_attempts else 0
 
+    # No prior term exists in the data yet (course_offerings only has
+    # current-term rows), so we report the real value only and leave
+    # delta/direction unset rather than fabricate a trend. Once a prior
+    # term's exam_attempts are available, compute a real comparison here.
     kpis = [
-        {
-            "label": "Exams administered",
-            "value": str(total_exams),
-            "delta": "+12%",
-            "direction": "up",
-        },
-        {
-            "label": "Total participants",
-            "value": str(taken_attempts),
-            "delta": "+5%",
-            "direction": "up",
-        },
-        {
-            "label": "Average pass rate",
-            "value": f"{pass_rate:.1f}%",
-            "delta": "+2.1%",
-            "direction": "up",
-        },
-        {
-            "label": "Completion rate",
-            "value": f"{completion:.1f}%",
-            "delta": "+1.1%",
-            "direction": "up",
-        },
+        {"label": "Exams administered", "value": str(total_exams)},
+        {"label": "Total participants", "value": str(taken_attempts)},
+        {"label": "Average pass rate", "value": f"{pass_rate:.1f}%"},
+        {"label": "Completion rate", "value": f"{completion:.1f}%"},
     ]
 
     course_query = """
@@ -91,13 +74,27 @@ async def get_management_overview(ctx: UserContext, db: asyncpg.Connection) -> d
         for r in college_rows
     ]
 
+    # Real month-by-month activity from actual exam schedule/attempt dates
+    # (previously random.randint() placeholders).
+    timeline_query = """
+    SELECT
+        to_char(date_trunc('month', x.scheduled_at), 'Mon') AS month,
+        extract(month FROM x.scheduled_at)::int AS month_num,
+        count(DISTINCT x.id) AS exams,
+        count(*) FILTER (WHERE a.status <> 'absent') AS participants
+    FROM exams x
+    LEFT JOIN exam_attempts a ON a.exam_id = x.id
+    GROUP BY 1, 2
+    ORDER BY 2;
+    """
+    timeline_rows = await db.fetch(timeline_query)
     timeline = [
         {
-            "month": month,
-            "exams": random.randint(10, 40),
-            "participants": random.randint(100, 300),
+            "month": r["month"],
+            "exams": r["exams"],
+            "participants": r["participants"],
         }
-        for month in ["Feb", "Mar", "Apr", "May", "Jun", "Jul"]
+        for r in timeline_rows
     ]
 
     if not pass_rate_by_college:

@@ -17,7 +17,14 @@ import {
 import {
   roleHome,
 } from "@/lib/role-guards";
-import { getAuthToken, userIdFromToken } from "@/lib/auth-token";
+import { useRouterState } from "@tanstack/react-router";
+import {
+  getAuthToken,
+  roleFromToken,
+  scopeIdFromToken,
+  studentIdFromToken,
+  userIdFromToken,
+} from "@/lib/auth-token";
 
 export interface NavItem {
   to: string;
@@ -261,6 +268,36 @@ interface RoleContextValue {
   viewer: ReturnType<typeof viewerScopeFor>;
 }
 
+/**
+ * Resolve the signed-in user's role/scope straight from the verified JWT
+ * claims. Demo accounts (present in mock-data's directory) additionally get
+ * their display name/title/initials/course assignments from that directory,
+ * but the *role and scope that gate navigation and data access always come
+ * from the token itself* — never from a directory lookup. This avoids a
+ * real (non-demo) account silently inheriting the "senior_management"
+ * default just because its user_id isn't in the mock directory.
+ */
+function userFromToken(token: string | null): DemoUser | null {
+  const userId = userIdFromToken(token);
+  const role = roleFromToken(token);
+  if (!userId || !role) return null;
+
+  const known = demoUserById(userId);
+  if (known && known.role === role) return known;
+
+  const scopeId = scopeIdFromToken(token);
+  const studentId = studentIdFromToken(token);
+  return {
+    id: userId,
+    name: userId,
+    title: roleLabels[role],
+    initials: userId.slice(0, 2).toUpperCase(),
+    role,
+    scopeId,
+    ...(studentId ? { studentId } : {}),
+  };
+}
+
 const defaultUser = demoUserForRole("senior_management");
 
 const RoleContext = createContext<RoleContextValue>({
@@ -275,15 +312,13 @@ const RoleContext = createContext<RoleContextValue>({
 });
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [userId, setUserIdState] = useState<string>(() => {
-    return userIdFromToken(getAuthToken()) ?? demoUserForRole("senior_management").id;
+  const [user, setUserState] = useState<DemoUser>(() => {
+    return userFromToken(getAuthToken()) ?? demoUserForRole("senior_management");
   });
+  const role = user.role;
 
   // Actually, we shouldn't allow changing users via demo UI anymore.
   // The user is fixed to the token payload.
-
-  const user = demoUserById(userId) ?? demoUserForRole("senior_management");
-  const role = user.role;
 
   const setUser = (nextId: string) => {
     // Disabled in real auth mode, but kept for UI compatibility if needed.
@@ -294,11 +329,20 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     // Disabled
   };
 
+  // Re-check the token on every route change, not just when `user` itself
+  // changes. The previous version depended only on `user.id`/`user.role`,
+  // which meant it could only ever re-fire in response to its own prior
+  // update — a chicken-and-egg trap that silently kept stale (e.g. default
+  // demo) role/nav state around after a same-tab client-side navigation
+  // wrote a fresh token (login no longer hits this path since it now does
+  // a full reload, but this keeps the provider self-correcting regardless).
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
   useEffect(() => {
     const token = getAuthToken();
-    const nextId = userIdFromToken(token);
-    if (nextId && nextId !== userId) {
-      setUserIdState(nextId);
+    const next = userFromToken(token);
+    if (next && (next.id !== user.id || next.role !== user.role)) {
+      setUserState(next);
     }
     if (
       typeof window !== "undefined" &&
@@ -307,7 +351,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     ) {
       window.location.href = "/login";
     }
-  }, [user.id, user.role, userId]);
+  }, [pathname, user.id, user.role]);
 
   return (
     <RoleContext.Provider

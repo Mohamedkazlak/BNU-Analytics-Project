@@ -29,14 +29,21 @@ import type {
 import { getAuthToken, clearAuthToken } from "./auth-token";
 
 const USE_FASTAPI_BACKEND = true; // Toggle to true once the FastAPI backend is running
-const BACKEND_URL = "http://localhost:8000";
+export const BACKEND_URL: string =
+  import.meta.env["VITE_BACKEND_URL"] ?? "http://localhost:8000";
 
-async function fetchFromBackend<T>(endpoint: string): Promise<T> {
+export async function fetchFromBackend<T>(
+  endpoint: string,
+  init?: { method?: "GET" | "POST"; body?: unknown },
+): Promise<T> {
   const token = getAuthToken();
   const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+    method: init?.method ?? "GET",
     headers: {
       Authorization: token ? `Bearer ${token}` : "",
+      ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),
     },
+    ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
   if (response.status === 401) {
     clearAuthToken();

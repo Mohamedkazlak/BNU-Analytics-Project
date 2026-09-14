@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { roleRoutes, getActiveDemoRole } from "../lib/role-guards";
 import { setAuthToken } from "../lib/auth-token";
+import { BACKEND_URL } from "../lib/api";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
@@ -34,7 +35,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/auth/login", {
+      const res = await fetch(`${BACKEND_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, password }),
@@ -47,14 +48,19 @@ function Login() {
       const data = await res.json();
       setAuthToken(data.access_token);
 
-      const meRes = await fetch("http://localhost:8000/auth/me", {
+      const meRes = await fetch(`${BACKEND_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${data.access_token}` },
       });
       const me = await meRes.json();
 
       const role = me.role as keyof typeof roleRoutes;
       const targetRoute = roleRoutes[role] || "/my-progress";
-      await navigate({ to: targetRoute });
+      // Full navigation (not the SPA `navigate()`) so RoleProvider remounts
+      // and re-reads the freshly-written token. RoleProvider's sync effect
+      // only re-checks the token when its own derived role/user state
+      // changes, so a client-side transition right after login would keep
+      // showing the previous (default) role's nav until a manual reload.
+      window.location.href = targetRoute;
     } catch (err: any) {
       setError(err.message);
     } finally {

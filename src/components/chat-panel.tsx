@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { MessageCircle, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
@@ -48,7 +47,6 @@ export function ChatPanel() {
   const [context, setContext] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
-  const ask = useServerFn(askAssistant);
   const threadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,7 +74,7 @@ export function ChatPanel() {
     setMessages((m) => [...m, { id: Date.now(), from: "user", text }]);
     setPending(true);
     try {
-      const answer = await ask({ data: { role, userId: user.id, question: text } });
+      const answer = await askAssistant(text);
       setMessages((m) => [...m, { id: Date.now() + 1, from: "ai", text: answer.text, blocked: answer.blocked }]);
     } catch {
       setMessages((m) => [

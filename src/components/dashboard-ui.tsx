@@ -31,9 +31,11 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
     <div className="glass-panel p-5">
       <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-soft">{kpi.label}</div>
       <div className="font-display mt-2 text-3xl font-extrabold text-ink">{kpi.value}</div>
-      <div className={cn("mt-1 text-[12px] font-semibold", kpi.direction === "up" ? "text-mintink" : "text-rosee")}>
-        {kpi.direction === "up" ? "▲" : "▼"} {kpi.delta}
-      </div>
+      {kpi.delta && kpi.direction && (
+        <div className={cn("mt-1 text-[12px] font-semibold", kpi.direction === "up" ? "text-mintink" : "text-rosee")}>
+          {kpi.direction === "up" ? "▲" : "▼"} {kpi.delta}
+        </div>
+      )}
     </div>
   );
 }

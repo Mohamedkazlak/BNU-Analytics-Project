@@ -48,3 +48,15 @@ export function userIdFromToken(token: string | null): string | null {
   const payload = parseJwt(token);
   return (payload?.user_id as string | undefined) ?? null;
 }
+
+export function scopeIdFromToken(token: string | null): string | null {
+  if (!token) return null;
+  const payload = parseJwt(token);
+  return (payload?.scope_id as string | undefined) ?? null;
+}
+
+export function studentIdFromToken(token: string | null): string | null {
+  if (!token) return null;
+  const payload = parseJwt(token);
+  return (payload?.student_id as string | undefined) ?? null;
+}
