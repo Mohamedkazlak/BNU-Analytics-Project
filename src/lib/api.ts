@@ -26,18 +26,31 @@ import type {
   StudentPerformanceReport,
   StudentProfileReport,
 } from "./types";
-import { getActiveDemoUserId } from "./role-guards";
+import { getAuthToken, clearAuthToken } from "./auth-token";
 
 const USE_FASTAPI_BACKEND = true; // Toggle to true once the FastAPI backend is running
 const BACKEND_URL = "http://localhost:8000";
 
 async function fetchFromBackend<T>(endpoint: string): Promise<T> {
-  const userId = getActiveDemoUserId();
+  const token = getAuthToken();
   const response = await fetch(`${BACKEND_URL}${endpoint}`, {
     headers: {
-      "X-User-Id": userId,
+      Authorization: token ? `Bearer ${token}` : "",
     },
   });
+  if (response.status === 401) {
+    clearAuthToken();
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/login"
+    ) {
+      window.location.href = "/login";
+    }
+    throw new Error("Unauthorized");
+  }
+  if (response.status === 403) {
+    throw new Error("Access Denied");
+  }
   if (!response.ok) {
     throw new Error(`Backend error: ${response.status} ${response.statusText}`);
   }
@@ -632,7 +645,8 @@ export function getRealTimeStruggling(
   });
 }
 
-export function getStudentDashboard(): Promise<StudentDashboardReport> {
+export function getStudentDashboard(scope?: ViewerScope): Promise<StudentDashboardReport> {
+  if (USE_FASTAPI_BACKEND) return fetchFromBackend<StudentDashboardReport>("/api/student-dashboard");
   return request(() => {
     const student = students.find((s) => s.id === currentStudentId)!;
     const scope = getActiveViewerScope();
@@ -719,6 +733,7 @@ export function getStudentProfile(
   studentId: string,
   scope?: ViewerScope,
 ): Promise<StudentProfileReport> {
+  if (USE_FASTAPI_BACKEND) return fetchFromBackend<StudentProfileReport>(`/api/students/${studentId}`);
   return request(() => {
     const v = scope ?? getActiveViewerScope();
     if (!studentInViewerScope(v, studentId)) {

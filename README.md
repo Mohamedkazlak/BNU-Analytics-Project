@@ -2,7 +2,7 @@
 
 Assessment reporting and analytics for Benha National University online testing programs. Role-scoped dashboards cover exam activity, student performance, participation, item analysis, academic integrity, and live exam monitoring.
 
-**Live app**: https://visual-files.lovable.app
+**Live app**: [https://visual-files.lovable.app](https://visual-files.lovable.app)
 
 This project was built with [Lovable](https://lovable.dev). Continue in the [Lovable editor](https://lovable.dev/projects/9f949ac3-26a0-42dd-bf4b-c8597d91fb59) — commits on the connected branch sync both ways.
 
@@ -18,16 +18,18 @@ The frontend talks to the FastAPI server at `http://localhost:8000` (see `src/li
 
 ## Demo roles
 
-The UI switches demo users from the app shell. Each request sends `X-User-Id` so Postgres RLS scopes the rows.
+The UI switches demo users by logging in. Each request sends an `Authorization: Bearer <jwt>` header so Postgres RLS scopes the rows.
 
-| Role                    | Home route          |
-| ----------------------- | ------------------- |
-| `senior_management`     | `/management`       |
-| `program_director`      | `/program-director` |
-| `academic_affairs`      | `/academic-affairs` |
-| `professor`             | `/professor`        |
-| `it_academic_integrity` | `/integrity`        |
-| `student`               | `/my-progress`      |
+| Route               | Role                                | Data Scope                                          |
+| ------------------- | ----------------------------------- | --------------------------------------------------- |
+| `/management`       | University President                | Sees everything about everyone                      |
+| `/management`       | Vice President for Academic Affairs | Sees everything about everyone                      |
+| `/management`       | Sector Dean                         | Sees everything about the colleges he supervises    |
+| `/program-director` | Program Director                    | Sees everything about his college                   |
+| `/academic-affairs` | Academic Affairs (college-level)    | Sees everything about students of his college-level |
+| `/professor`        | Professor                           | Sees everything about his curriculums               |
+| `/integrity`        | It Admins / Academic Integrity      | Sees live exam monitoring and flagged cases         |
+| `/my-progress`      | Students                            | Sees his own performance and recommendations        |
 
 Unauthorized paths redirect to that role’s home.
 
@@ -56,9 +58,9 @@ pip install -r requirements.txt
 DATABASE_URL="postgresql://user:pass@localhost:5432/postgres" uvicorn main:app --reload
 ```
 
-Interactive OpenAPI docs: http://localhost:8000/docs
+Interactive OpenAPI docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-Every API below requires the `X-User-Id` header (demo user id from the frontend). Missing header → `401`.
+Every API below requires the `Authorization: Bearer <jwt>` header. Missing or invalid token → `401`. Roles outside the allowed list → `403`.
 
 ---
 

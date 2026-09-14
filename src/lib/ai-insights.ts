@@ -81,7 +81,8 @@ function request<T>(payload: () => T, ms = 900): Promise<T> {
  * server — never from a prop, query string or client-side store.
  */
 export function demoSession(role: Role): ScopeSession {
-  const active = demoUserById(getActiveDemoUserId());
+  const activeId = getActiveDemoUserId();
+  const active = activeId ? demoUserById(activeId) : undefined;
   const user = active?.role === role ? active : demoUserForRole(role);
   switch (role) {
     case "student":
@@ -332,7 +333,9 @@ function buildPrediction(scope: Scope): Prediction | null {
       return null;
     case "professor": {
       assertCanRead(scope, "item_analysis");
-      const codes = curriculaFor(scope).map((c) => c.code).join(", ");
+      const codes = curriculaFor(scope)
+        .map((c) => c.code)
+        .join(", ");
       return {
         title: `Forecast · item-quality drift · ${codes}`,
         direction: "rising",
@@ -362,7 +365,11 @@ function buildPrediction(scope: Scope): Prediction | null {
         summary:
           "Composite risk has risen for 3 consecutive sittings university-wide, driven mainly by IP overlap during remote exams.",
         rows: [
-          { label: "Computer Science", value: "Rising · +12 pts", tone: "rose" },
+          {
+            label: "Computer Science",
+            value: "Rising · +12 pts",
+            tone: "rose",
+          },
           { label: "Medicine", value: "Stable", tone: "iris" },
           { label: "Engineering", value: "Falling · −6 pts", tone: "mint" },
         ],
@@ -427,12 +434,9 @@ function buildPrediction(scope: Scope): Prediction | null {
           summary: `Projected end-of-term pass rates for the colleges you supervise.`,
           rows: colleges.slice(0, 3).map((college, i) => ({
             label: college,
-            value:
-              i === 0 ? "68% → 61%" : i === 1 ? "74% → 72%" : "81% → 82%",
+            value: i === 0 ? "68% → 61%" : i === 1 ? "74% → 72%" : "81% → 82%",
             tone: (i === 0 ? "rose" : i === 1 ? "amber" : "mint") as
-              | "rose"
-              | "amber"
-              | "mint",
+              "rose" | "amber" | "mint",
           })),
           action: { label: "Open college view", to: "/courses" },
         };

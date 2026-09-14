@@ -16,11 +16,8 @@ import {
 } from "@/lib/mock-data";
 import {
   roleHome,
-  getActiveDemoRole,
-  getActiveDemoUserId,
-  setActiveDemoRole,
-  setActiveDemoUserId,
 } from "@/lib/role-guards";
+import { getAuthToken, userIdFromToken } from "@/lib/auth-token";
 
 export interface NavItem {
   to: string;
@@ -279,29 +276,38 @@ const RoleContext = createContext<RoleContextValue>({
 
 export function RoleProvider({ children }: { children: ReactNode }) {
   const [userId, setUserIdState] = useState<string>(() => {
-    const stored = getActiveDemoUserId();
-    return demoUserById(stored)?.id ?? demoUserForRole(getActiveDemoRole()).id;
+    return userIdFromToken(getAuthToken()) ?? demoUserForRole("senior_management").id;
   });
+
+  // Actually, we shouldn't allow changing users via demo UI anymore.
+  // The user is fixed to the token payload.
+
   const user = demoUserById(userId) ?? demoUserForRole("senior_management");
   const role = user.role;
 
   const setUser = (nextId: string) => {
-    const next = demoUserById(nextId);
-    if (!next) return;
-    setUserIdState(next.id);
-    setActiveDemoUserId(next.id);
-    setActiveDemoRole(next.role);
+    // Disabled in real auth mode, but kept for UI compatibility if needed.
+    // In real auth, you must log in to change user.
   };
 
   const setRole = (next: Role) => {
-    const match = demoUsers.find((u) => u.role === next);
-    if (match) setUser(match.id);
+    // Disabled
   };
 
   useEffect(() => {
-    setActiveDemoUserId(user.id);
-    setActiveDemoRole(user.role);
-  }, [user.id, user.role]);
+    const token = getAuthToken();
+    const nextId = userIdFromToken(token);
+    if (nextId && nextId !== userId) {
+      setUserIdState(nextId);
+    }
+    if (
+      typeof window !== "undefined" &&
+      !token &&
+      window.location.pathname !== "/login"
+    ) {
+      window.location.href = "/login";
+    }
+  }, [user.id, user.role, userId]);
 
   return (
     <RoleContext.Provider

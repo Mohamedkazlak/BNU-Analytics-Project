@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  redirect,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -13,14 +14,19 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { RoleProvider } from "@/components/role-context";
 import { AppShell } from "@/components/app-shell";
+import { getActiveDemoRole } from "@/lib/role-guards";
 
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="glass-panel max-w-md p-8 text-center">
         <h1 className="font-display text-6xl font-extrabold text-ink">404</h1>
-        <h2 className="font-display mt-4 text-xl font-bold text-ink">Report not found</h2>
-        <p className="mt-2 text-sm text-ink-soft">This report doesn't exist or has been moved.</p>
+        <h2 className="font-display mt-4 text-xl font-bold text-ink">
+          Report not found
+        </h2>
+        <p className="mt-2 text-sm text-ink-soft">
+          This report doesn't exist or has been moved.
+        </p>
         <div className="mt-6">
           <Link
             to="/management"
@@ -44,8 +50,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="glass-panel max-w-md p-8 text-center">
-        <h1 className="font-display text-xl font-bold text-ink">This report didn't load</h1>
-        <p className="mt-2 text-sm text-ink-soft">Something went wrong while fetching the data.</p>
+        <h1 className="font-display text-xl font-bold text-ink">
+          This report didn't load
+        </h1>
+        <p className="mt-2 text-sm text-ink-soft">
+          Something went wrong while fetching the data.
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -68,32 +78,51 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "BNU — AI-driven Dashboard" },
-      { name: "description", content: "Assessment reporting and analytics for online testing programs." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap",
-      },
-      { rel: "icon", href: "/favicon.png", type: "image/png" },
-    ],
-  }),
-  shellComponent: RootShell,
-  component: RootComponent,
-  notFoundComponent: NotFoundComponent,
-  errorComponent: ErrorComponent,
-});
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
+  {
+    beforeLoad: ({ location }) => {
+      if (location.pathname === "/login") return;
+      // localStorage is only available in the browser. Skip on SSR so a
+      // successful login is not bounced back to /login during hydration.
+      if (typeof window === "undefined") return;
+      if (!getActiveDemoRole()) {
+        throw redirect({ to: "/login" });
+      }
+    },
+    head: () => ({
+      meta: [
+        { charSet: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { title: "BNU — AI-driven Dashboard" },
+        {
+          name: "description",
+          content:
+            "Assessment reporting and analytics for online testing programs.",
+        },
+        { property: "og:type", content: "website" },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+      links: [
+        { rel: "stylesheet", href: appCss },
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        {
+          rel: "preconnect",
+          href: "https://fonts.gstatic.com",
+          crossOrigin: "anonymous",
+        },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap",
+        },
+        { rel: "icon", href: "/favicon.png", type: "image/png" },
+      ],
+    }),
+    shellComponent: RootShell,
+    component: RootComponent,
+    notFoundComponent: NotFoundComponent,
+    errorComponent: ErrorComponent,
+  },
+);
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
@@ -111,14 +140,20 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+  const isLogin = router.state.location.pathname === "/login";
 
   return (
     <QueryClientProvider client={queryClient}>
       <RoleProvider>
-        <AppShell>
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        {isLogin ? (
           <Outlet />
-        </AppShell>
+        ) : (
+          <AppShell>
+            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+            <Outlet />
+          </AppShell>
+        )}
       </RoleProvider>
     </QueryClientProvider>
   );

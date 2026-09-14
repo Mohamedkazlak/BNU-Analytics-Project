@@ -342,41 +342,169 @@ export const terms: TermRow[] = [
  * ------------------------------------------------------------------------- */
 
 export const people: PersonRow[] = [
-  { id: "p-priya-raman", fullName: "Dr. Priya Raman", email: slugEmail("Priya Raman") },
-  { id: "p-karim-fawzy", fullName: "Prof. Karim Fawzy", email: slugEmail("Karim Fawzy") },
-  { id: "p-hana-elmasry", fullName: "Dr. Hana El-Masry", email: slugEmail("Hana El-Masry") },
-  { id: "p-daniel-osei", fullName: "Prof. Daniel Osei", email: slugEmail("Daniel Osei") },
-  { id: "p-sara-mansour", fullName: "Sara Mansour", email: slugEmail("Sara Mansour") },
-  { id: "p-tomas-oyelaran", fullName: "Prof. Tomas Oyelaran", email: slugEmail("Tomas Oyelaran") },
-  { id: "p-layla-nasser", fullName: "Layla Nasser", email: slugEmail("Layla Nasser") },
-  { id: "p-yasser-mansour", fullName: "Prof. Yasser Mansour", email: slugEmail("Yasser Mansour") },
-  { id: "p-mai-khalil", fullName: "Dr. Mai Khalil", email: slugEmail("Mai Khalil") },
-  { id: "p-tarek-fouad", fullName: "Dr. Tarek Fouad", email: slugEmail("Tarek Fouad") },
-  { id: "p-yasmin-adel", fullName: "Dr. Yasmin Adel", email: slugEmail("Yasmin Adel") },
-  { id: "p-walid-naguib", fullName: "Prof. Walid Naguib", email: slugEmail("Walid Naguib") },
-  { id: "p-amira-saleh", fullName: "Dr. Amira Saleh", email: slugEmail("Amira Saleh") },
-  { id: "p-nabil-youssef", fullName: "Prof. Nabil Youssef", email: slugEmail("Nabil Youssef") },
-  { id: "p-lina-haddad", fullName: "Prof. Lina Haddad", email: slugEmail("Lina Haddad") },
-  { id: "p-nour-elsayed", fullName: "Dr. Nour El-Sayed", email: slugEmail("Nour El-Sayed") },
+  {
+    id: "p-priya-raman",
+    fullName: "Dr. Priya Raman",
+    email: slugEmail("Priya Raman"),
+  },
+  {
+    id: "p-karim-fawzy",
+    fullName: "Prof. Karim Fawzy",
+    email: slugEmail("Karim Fawzy"),
+  },
+  {
+    id: "p-hana-elmasry",
+    fullName: "Dr. Hana El-Masry",
+    email: slugEmail("Hana El-Masry"),
+  },
+  {
+    id: "p-daniel-osei",
+    fullName: "Prof. Daniel Osei",
+    email: slugEmail("Daniel Osei"),
+  },
+  {
+    id: "p-sara-mansour",
+    fullName: "Sara Mansour",
+    email: slugEmail("Sara Mansour"),
+  },
+  {
+    id: "p-tomas-oyelaran",
+    fullName: "Prof. Tomas Oyelaran",
+    email: slugEmail("Tomas Oyelaran"),
+  },
+  {
+    id: "p-layla-nasser",
+    fullName: "Layla Nasser",
+    email: slugEmail("Layla Nasser"),
+  },
+  {
+    id: "p-yasser-mansour",
+    fullName: "Prof. Yasser Mansour",
+    email: slugEmail("Yasser Mansour"),
+  },
+  {
+    id: "p-mai-khalil",
+    fullName: "Dr. Mai Khalil",
+    email: slugEmail("Mai Khalil"),
+  },
+  {
+    id: "p-tarek-fouad",
+    fullName: "Dr. Tarek Fouad",
+    email: slugEmail("Tarek Fouad"),
+  },
+  {
+    id: "p-yasmin-adel",
+    fullName: "Dr. Yasmin Adel",
+    email: slugEmail("Yasmin Adel"),
+  },
+  {
+    id: "p-walid-naguib",
+    fullName: "Prof. Walid Naguib",
+    email: slugEmail("Walid Naguib"),
+  },
+  {
+    id: "p-amira-saleh",
+    fullName: "Dr. Amira Saleh",
+    email: slugEmail("Amira Saleh"),
+  },
+  {
+    id: "p-nabil-youssef",
+    fullName: "Prof. Nabil Youssef",
+    email: slugEmail("Nabil Youssef"),
+  },
+  {
+    id: "p-lina-haddad",
+    fullName: "Prof. Lina Haddad",
+    email: slugEmail("Lina Haddad"),
+  },
+  {
+    id: "p-nour-elsayed",
+    fullName: "Dr. Nour El-Sayed",
+    email: slugEmail("Nour El-Sayed"),
+  },
 ];
 
 export const staff: StaffRow[] = [
-  { personId: "p-priya-raman", title: "University President", orgUnitId: UNIVERSITY_SCOPE_ID },
-  { personId: "p-karim-fawzy", title: "VP for Academic Affairs", orgUnitId: UNIVERSITY_SCOPE_ID },
-  { personId: "p-hana-elmasry", title: "Dean, Engineering and Basic & Applied Sciences", orgUnitId: "sec-engineering" },
-  { personId: "p-daniel-osei", title: "Program Director, Computer Science", orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID },
-  { personId: "p-sara-mansour", title: "Academic Affairs Officer, Computer Science", orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID },
-  { personId: "p-tomas-oyelaran", title: "Professor of Computer Science", orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID },
-  { personId: "p-layla-nasser", title: "IT · Academic Integrity", orgUnitId: UNIVERSITY_SCOPE_ID },
-  { personId: "p-yasser-mansour", title: "Professor of Energy Sciences", orgUnitId: "prog-energy-sciences" },
-  { personId: "p-mai-khalil", title: "Lecturer of Computer Science", orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID },
-  { personId: "p-tarek-fouad", title: "Lecturer of Computer Science", orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID },
-  { personId: "p-yasmin-adel", title: "Professor of Medicine", orgUnitId: "prog-medicine" },
-  { personId: "p-walid-naguib", title: "Professor of Dentistry", orgUnitId: "prog-dentistry" },
-  { personId: "p-amira-saleh", title: "Professor of Physical Therapy", orgUnitId: "prog-physical-therapy" },
-  { personId: "p-nabil-youssef", title: "Professor of Veterinary Medicine", orgUnitId: "prog-veterinary" },
-  { personId: "p-lina-haddad", title: "Professor of Visual Arts", orgUnitId: "prog-visual-arts" },
-  { personId: "p-nour-elsayed", title: "Professor of Economics", orgUnitId: "prog-economics" },
+  {
+    personId: "p-priya-raman",
+    title: "University President",
+    orgUnitId: UNIVERSITY_SCOPE_ID,
+  },
+  {
+    personId: "p-karim-fawzy",
+    title: "VP for Academic Affairs",
+    orgUnitId: UNIVERSITY_SCOPE_ID,
+  },
+  {
+    personId: "p-hana-elmasry",
+    title: "Dean, Engineering and Basic & Applied Sciences",
+    orgUnitId: "sec-engineering",
+  },
+  {
+    personId: "p-daniel-osei",
+    title: "Program Director, Computer Science",
+    orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID,
+  },
+  {
+    personId: "p-sara-mansour",
+    title: "Academic Affairs Officer, Computer Science",
+    orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID,
+  },
+  {
+    personId: "p-tomas-oyelaran",
+    title: "Professor of Computer Science",
+    orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID,
+  },
+  {
+    personId: "p-layla-nasser",
+    title: "IT · Academic Integrity",
+    orgUnitId: UNIVERSITY_SCOPE_ID,
+  },
+  {
+    personId: "p-yasser-mansour",
+    title: "Professor of Energy Sciences",
+    orgUnitId: "prog-energy-sciences",
+  },
+  {
+    personId: "p-mai-khalil",
+    title: "Lecturer of Computer Science",
+    orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID,
+  },
+  {
+    personId: "p-tarek-fouad",
+    title: "Lecturer of Computer Science",
+    orgUnitId: ACADEMIC_AFFAIRS_SCOPE_ID,
+  },
+  {
+    personId: "p-yasmin-adel",
+    title: "Professor of Medicine",
+    orgUnitId: "prog-medicine",
+  },
+  {
+    personId: "p-walid-naguib",
+    title: "Professor of Dentistry",
+    orgUnitId: "prog-dentistry",
+  },
+  {
+    personId: "p-amira-saleh",
+    title: "Professor of Physical Therapy",
+    orgUnitId: "prog-physical-therapy",
+  },
+  {
+    personId: "p-nabil-youssef",
+    title: "Professor of Veterinary Medicine",
+    orgUnitId: "prog-veterinary",
+  },
+  {
+    personId: "p-lina-haddad",
+    title: "Professor of Visual Arts",
+    orgUnitId: "prog-visual-arts",
+  },
+  {
+    personId: "p-nour-elsayed",
+    title: "Professor of Economics",
+    orgUnitId: "prog-economics",
+  },
 ];
 
 function personName(id: string) {
@@ -390,46 +518,308 @@ function personName(id: string) {
  * ------------------------------------------------------------------------- */
 
 export const courseCatalog: CourseRow[] = [
-  { id: "c-eng-110", programId: "prog-engineering", code: "ENG 110", name: "Engineering Drawing", credits: 3, yearLevel: 1 },
-  { id: "c-eng-120", programId: "prog-engineering", code: "ENG 120", name: "Mechanics I", credits: 4, yearLevel: 1 },
-  { id: "c-eng-130", programId: "prog-engineering", code: "ENG 130", name: "Mechanics II", credits: 4, yearLevel: 2 },
-  { id: "c3", programId: "prog-engineering", code: "ENG 210", name: "Statics & Structural Analysis", credits: 4, yearLevel: 3 },
-  { id: "c-ene-110", programId: "prog-energy-sciences", code: "ENE 110", name: "Introduction to Energy Systems", credits: 3, yearLevel: 1 },
-  { id: "c-ene-120", programId: "prog-energy-sciences", code: "ENE 120", name: "Fluid Mechanics", credits: 4, yearLevel: 1 },
-  { id: "c-ene-210", programId: "prog-energy-sciences", code: "ENE 210", name: "Heat Transfer", credits: 3, yearLevel: 2 },
-  { id: "c2", programId: "prog-energy-sciences", code: "ENR 220", name: "Thermodynamics of Energy Systems", credits: 4, yearLevel: 3 },
-  { id: "c-cs-101", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "CS 101", name: "Programming I", credits: 4, yearLevel: 1 },
-  { id: "c-cs-102", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "CS 102", name: "Discrete Mathematics", credits: 3, yearLevel: 1 },
-  { id: "c-cs-103", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "MATH 101", name: "Calculus for Computing", credits: 3, yearLevel: 1 },
-  { id: "c-cs-203", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "CS 203", name: "Computer Organization", credits: 3, yearLevel: 2 },
-  { id: "c-cs-204", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "CS 204", name: "Software Engineering", credits: 3, yearLevel: 2 },
-  { id: "c-cs-205", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "CS 205", name: "Computer Networks", credits: 3, yearLevel: 2 },
-  { id: "c1", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "CS 201", name: "Data Structures & Algorithms", credits: 4, yearLevel: 3 },
-  { id: "c10", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "CS 202", name: "Database Systems", credits: 3, yearLevel: 3 },
-  { id: "c11", programId: ACADEMIC_AFFAIRS_SCOPE_ID, code: "CS 301", name: "Operating Systems", credits: 4, yearLevel: 3 },
-  { id: "c-med-110", programId: "prog-medicine", code: "MED 101", name: "Medical Biology", credits: 4, yearLevel: 1 },
-  { id: "c-med-120", programId: "prog-medicine", code: "MED 102", name: "Biochemistry I", credits: 3, yearLevel: 1 },
-  { id: "c-med-201", programId: "prog-medicine", code: "MED 201", name: "Physiology I", credits: 4, yearLevel: 2 },
-  { id: "c4", programId: "prog-medicine", code: "MED 110", name: "Human Anatomy", credits: 5, yearLevel: 3 },
-  { id: "c-den-110", programId: "prog-dentistry", code: "DEN 101", name: "Dental Morphology", credits: 3, yearLevel: 1 },
-  { id: "c-den-201", programId: "prog-dentistry", code: "DEN 201", name: "Dental Materials", credits: 3, yearLevel: 2 },
-  { id: "c5", programId: "prog-dentistry", code: "DEN 120", name: "Oral Biology", credits: 4, yearLevel: 3 },
-  { id: "c-pt-110", programId: "prog-physical-therapy", code: "PT 101", name: "Foundations of Rehabilitation", credits: 3, yearLevel: 1 },
-  { id: "c-pt-201", programId: "prog-physical-therapy", code: "PT 201", name: "Therapeutic Exercise", credits: 3, yearLevel: 2 },
-  { id: "c6", programId: "prog-physical-therapy", code: "PT 130", name: "Kinesiology", credits: 4, yearLevel: 3 },
-  { id: "c-vet-110", programId: "prog-veterinary", code: "VET 101", name: "Animal Anatomy", credits: 4, yearLevel: 1 },
-  { id: "c-vet-201", programId: "prog-veterinary", code: "VET 201", name: "Veterinary Microbiology", credits: 3, yearLevel: 2 },
-  { id: "c7", programId: "prog-veterinary", code: "VET 140", name: "Animal Physiology", credits: 4, yearLevel: 3 },
-  { id: "c-art-110", programId: "prog-visual-arts", code: "ART 101", name: "Drawing Fundamentals", credits: 3, yearLevel: 1 },
-  { id: "c-art-201", programId: "prog-visual-arts", code: "ART 201", name: "Visual Communication", credits: 3, yearLevel: 2 },
-  { id: "c8", programId: "prog-visual-arts", code: "ART 150", name: "Design Studio I", credits: 4, yearLevel: 3 },
-  { id: "c-eco-110", programId: "prog-economics", code: "ECO 101", name: "Principles of Economics", credits: 3, yearLevel: 1 },
-  { id: "c-eco-201", programId: "prog-economics", code: "ECO 201", name: "Macroeconomic Theory", credits: 3, yearLevel: 2 },
-  { id: "c9", programId: "prog-economics", code: "ECO 160", name: "Microeconomic Theory", credits: 3, yearLevel: 3 },
+  {
+    id: "c-eng-110",
+    programId: "prog-engineering",
+    code: "ENG 110",
+    name: "Engineering Drawing",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-eng-120",
+    programId: "prog-engineering",
+    code: "ENG 120",
+    name: "Mechanics I",
+    credits: 4,
+    yearLevel: 1,
+  },
+  {
+    id: "c-eng-130",
+    programId: "prog-engineering",
+    code: "ENG 130",
+    name: "Mechanics II",
+    credits: 4,
+    yearLevel: 2,
+  },
+  {
+    id: "c3",
+    programId: "prog-engineering",
+    code: "ENG 210",
+    name: "Statics & Structural Analysis",
+    credits: 4,
+    yearLevel: 3,
+  },
+  {
+    id: "c-ene-110",
+    programId: "prog-energy-sciences",
+    code: "ENE 110",
+    name: "Introduction to Energy Systems",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-ene-120",
+    programId: "prog-energy-sciences",
+    code: "ENE 120",
+    name: "Fluid Mechanics",
+    credits: 4,
+    yearLevel: 1,
+  },
+  {
+    id: "c-ene-210",
+    programId: "prog-energy-sciences",
+    code: "ENE 210",
+    name: "Heat Transfer",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c2",
+    programId: "prog-energy-sciences",
+    code: "ENR 220",
+    name: "Thermodynamics of Energy Systems",
+    credits: 4,
+    yearLevel: 3,
+  },
+  {
+    id: "c-cs-101",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "CS 101",
+    name: "Programming I",
+    credits: 4,
+    yearLevel: 1,
+  },
+  {
+    id: "c-cs-102",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "CS 102",
+    name: "Discrete Mathematics",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-cs-103",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "MATH 101",
+    name: "Calculus for Computing",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-cs-203",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "CS 203",
+    name: "Computer Organization",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c-cs-204",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "CS 204",
+    name: "Software Engineering",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c-cs-205",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "CS 205",
+    name: "Computer Networks",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c1",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "CS 201",
+    name: "Data Structures & Algorithms",
+    credits: 4,
+    yearLevel: 3,
+  },
+  {
+    id: "c10",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "CS 202",
+    name: "Database Systems",
+    credits: 3,
+    yearLevel: 3,
+  },
+  {
+    id: "c11",
+    programId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    code: "CS 301",
+    name: "Operating Systems",
+    credits: 4,
+    yearLevel: 3,
+  },
+  {
+    id: "c-med-110",
+    programId: "prog-medicine",
+    code: "MED 101",
+    name: "Medical Biology",
+    credits: 4,
+    yearLevel: 1,
+  },
+  {
+    id: "c-med-120",
+    programId: "prog-medicine",
+    code: "MED 102",
+    name: "Biochemistry I",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-med-201",
+    programId: "prog-medicine",
+    code: "MED 201",
+    name: "Physiology I",
+    credits: 4,
+    yearLevel: 2,
+  },
+  {
+    id: "c4",
+    programId: "prog-medicine",
+    code: "MED 110",
+    name: "Human Anatomy",
+    credits: 5,
+    yearLevel: 3,
+  },
+  {
+    id: "c-den-110",
+    programId: "prog-dentistry",
+    code: "DEN 101",
+    name: "Dental Morphology",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-den-201",
+    programId: "prog-dentistry",
+    code: "DEN 201",
+    name: "Dental Materials",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c5",
+    programId: "prog-dentistry",
+    code: "DEN 120",
+    name: "Oral Biology",
+    credits: 4,
+    yearLevel: 3,
+  },
+  {
+    id: "c-pt-110",
+    programId: "prog-physical-therapy",
+    code: "PT 101",
+    name: "Foundations of Rehabilitation",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-pt-201",
+    programId: "prog-physical-therapy",
+    code: "PT 201",
+    name: "Therapeutic Exercise",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c6",
+    programId: "prog-physical-therapy",
+    code: "PT 130",
+    name: "Kinesiology",
+    credits: 4,
+    yearLevel: 3,
+  },
+  {
+    id: "c-vet-110",
+    programId: "prog-veterinary",
+    code: "VET 101",
+    name: "Animal Anatomy",
+    credits: 4,
+    yearLevel: 1,
+  },
+  {
+    id: "c-vet-201",
+    programId: "prog-veterinary",
+    code: "VET 201",
+    name: "Veterinary Microbiology",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c7",
+    programId: "prog-veterinary",
+    code: "VET 140",
+    name: "Animal Physiology",
+    credits: 4,
+    yearLevel: 3,
+  },
+  {
+    id: "c-art-110",
+    programId: "prog-visual-arts",
+    code: "ART 101",
+    name: "Drawing Fundamentals",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-art-201",
+    programId: "prog-visual-arts",
+    code: "ART 201",
+    name: "Visual Communication",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c8",
+    programId: "prog-visual-arts",
+    code: "ART 150",
+    name: "Design Studio I",
+    credits: 4,
+    yearLevel: 3,
+  },
+  {
+    id: "c-eco-110",
+    programId: "prog-economics",
+    code: "ECO 101",
+    name: "Principles of Economics",
+    credits: 3,
+    yearLevel: 1,
+  },
+  {
+    id: "c-eco-201",
+    programId: "prog-economics",
+    code: "ECO 201",
+    name: "Macroeconomic Theory",
+    credits: 3,
+    yearLevel: 2,
+  },
+  {
+    id: "c9",
+    programId: "prog-economics",
+    code: "ECO 160",
+    name: "Microeconomic Theory",
+    credits: 3,
+    yearLevel: 3,
+  },
 ];
 
 const currentCourseIds = new Set([
-  "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11",
+  "c1",
+  "c2",
+  "c3",
+  "c4",
+  "c5",
+  "c6",
+  "c7",
+  "c8",
+  "c9",
+  "c10",
+  "c11",
 ]);
 
 const currentInstructorByCourse: Record<string, string> = {
@@ -473,9 +863,10 @@ export const courseSections: CourseSectionRow[] = courseOfferings.flatMap(
     })),
 );
 
-export const staffCourseAssignments: StaffCourseAssignmentRow[] = Object.entries(
-  currentInstructorByCourse,
-).map(([courseId, staffPersonId]) => ({ staffPersonId, courseId }));
+export const staffCourseAssignments: StaffCourseAssignmentRow[] =
+  Object.entries(currentInstructorByCourse).map(
+    ([courseId, staffPersonId]) => ({ staffPersonId, courseId }),
+  );
 
 /* ---------------------------------------------------------------------------
  * STUDENTS
@@ -584,7 +975,8 @@ const studentNamesByProgram: Record<string, [string, string][]> = {
 };
 
 function sectionsForProgram(programId: string): string[] {
-  return programId === ACADEMIC_AFFAIRS_SCOPE_ID || programId === "prog-medicine"
+  return programId === ACADEMIC_AFFAIRS_SCOPE_ID ||
+    programId === "prog-medicine"
     ? ["A", "B", "C"]
     : ["A", "B"];
 }
@@ -657,7 +1049,9 @@ studentRows.forEach((student) => {
     return course?.programId === student.programId;
   });
   offerings.forEach((offering) => {
-    const available = courseSections.filter((s) => s.offeringId === offering.id);
+    const available = courseSections.filter(
+      (s) => s.offeringId === offering.id,
+    );
     const section =
       available.find((s) => s.code === student.section) ?? available[0]!;
     enrollmentRows.push({
@@ -690,7 +1084,9 @@ export const courses: Course[] = courseOfferings.map((offering) => {
   const sections = courseSections
     .filter((s) => s.offeringId === offering.id)
     .map((s) => s.code);
-  const enrolled = enrollments.filter((e) => e.offeringId === offering.id).length;
+  const enrolled = enrollments.filter(
+    (e) => e.offeringId === offering.id,
+  ).length;
   return {
     id: course.id,
     code: course.code,
@@ -858,7 +1254,9 @@ export const examAttemptRows: ExamAttemptRow[] = [];
 export const integrityFlags: IntegrityFlagRow[] = [];
 
 exams.forEach((exam, ei) => {
-  const courseEnrollments = enrollments.filter((e) => e.courseId === exam.courseId);
+  const courseEnrollments = enrollments.filter(
+    (e) => e.courseId === exam.courseId,
+  );
   courseEnrollments.forEach((enrollment) => {
     const si = studentIndex.get(enrollment.studentId) ?? 0;
     const student = students.find((s) => s.id === enrollment.studentId)!;
@@ -876,8 +1274,7 @@ exams.forEach((exam, ei) => {
     const lateStart = rng() > 0.92;
     const endMinutes = startMinute + timeTakenMin;
     const attemptCount = rng() > 0.94 ? 3 : rng() > 0.88 ? 2 : 1;
-    const live =
-      exam.status === "in_progress" || exam.status === "closing";
+    const live = exam.status === "in_progress" || exam.status === "closing";
     const status: ExamAttemptRow["status"] = !participated
       ? "absent"
       : live && si % 4 === 0
@@ -964,7 +1361,14 @@ export const attempts: Attempt[] = examAttemptRows.map((row) => {
 
 const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
   "prog-engineering": {
-    topics: ["Statics", "Free-body diagrams", "Beams", "Trusses", "Stress", "Moments"],
+    topics: [
+      "Statics",
+      "Free-body diagrams",
+      "Beams",
+      "Trusses",
+      "Stress",
+      "Moments",
+    ],
     prompts: [
       "Identify the reaction forces on the simply supported beam.",
       "Which member of the truss is in compression?",
@@ -975,7 +1379,14 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
     ],
   },
   "prog-energy-sciences": {
-    topics: ["Energy balances", "Cycles", "Heat transfer", "Fuels", "Thermodynamics", "Exergy"],
+    topics: [
+      "Energy balances",
+      "Cycles",
+      "Heat transfer",
+      "Fuels",
+      "Thermodynamics",
+      "Exergy",
+    ],
     prompts: [
       "Apply the first law to the open system below.",
       "Which cycle has the higher thermal efficiency at the same temperature limits?",
@@ -986,7 +1397,16 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
     ],
   },
   [ACADEMIC_AFFAIRS_SCOPE_ID]: {
-    topics: ["Recursion", "Complexity Analysis", "Graph Traversal", "Hashing", "Sorting", "Dynamic Programming", "Trees & Heaps", "Concurrency"],
+    topics: [
+      "Recursion",
+      "Complexity Analysis",
+      "Graph Traversal",
+      "Hashing",
+      "Sorting",
+      "Dynamic Programming",
+      "Trees & Heaps",
+      "Concurrency",
+    ],
     prompts: [
       "Which traversal visits the left subtree before the node?",
       "State the worst-case complexity of quicksort and justify it.",
@@ -999,7 +1419,14 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
     ],
   },
   "prog-medicine": {
-    topics: ["Anatomy", "Histology", "Physiology", "Clinical signs", "Embryology", "Neuroanatomy"],
+    topics: [
+      "Anatomy",
+      "Histology",
+      "Physiology",
+      "Clinical signs",
+      "Embryology",
+      "Neuroanatomy",
+    ],
     prompts: [
       "Identify the structure labelled on the cadaveric image.",
       "Which nerve is at risk in this surgical approach?",
@@ -1010,7 +1437,14 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
     ],
   },
   "prog-dentistry": {
-    topics: ["Oral biology", "Occlusion", "Caries", "Periodontium", "Dental anatomy", "Materials"],
+    topics: [
+      "Oral biology",
+      "Occlusion",
+      "Caries",
+      "Periodontium",
+      "Dental anatomy",
+      "Materials",
+    ],
     prompts: [
       "Identify the tissue layer labelled on the enamel-dentine junction.",
       "Which cusp is involved in this occlusal contact?",
@@ -1021,7 +1455,14 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
     ],
   },
   "prog-physical-therapy": {
-    topics: ["Kinesiology", "Gait", "Muscle testing", "Range of motion", "Posture", "Rehabilitation"],
+    topics: [
+      "Kinesiology",
+      "Gait",
+      "Muscle testing",
+      "Range of motion",
+      "Posture",
+      "Rehabilitation",
+    ],
     prompts: [
       "Which muscle is the prime mover in this action?",
       "Identify the gait phase shown in the still.",
@@ -1032,7 +1473,14 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
     ],
   },
   "prog-veterinary": {
-    topics: ["Animal physiology", "Species anatomy", "Clinical pathology", "Pharmacology", "Reproduction", "Nutrition"],
+    topics: [
+      "Animal physiology",
+      "Species anatomy",
+      "Clinical pathology",
+      "Pharmacology",
+      "Reproduction",
+      "Nutrition",
+    ],
     prompts: [
       "Which species has the digestive physiology described?",
       "Identify the structure on this bovine viscera plate.",
@@ -1043,7 +1491,14 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
     ],
   },
   "prog-visual-arts": {
-    topics: ["Composition", "Colour theory", "Typography", "Critique", "Visual culture", "Materials"],
+    topics: [
+      "Composition",
+      "Colour theory",
+      "Typography",
+      "Critique",
+      "Visual culture",
+      "Materials",
+    ],
     prompts: [
       "Which compositional principle is dominant in this work?",
       "Select the complementary pair used in the palette.",
@@ -1054,7 +1509,14 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
     ],
   },
   "prog-economics": {
-    topics: ["Demand", "Market structure", "Welfare", "Elasticity", "Policy", "Game theory"],
+    topics: [
+      "Demand",
+      "Market structure",
+      "Welfare",
+      "Elasticity",
+      "Policy",
+      "Game theory",
+    ],
     prompts: [
       "Which shift explains the price movement in this market?",
       "Identify the market structure implied by the cost curves.",
@@ -1068,7 +1530,8 @@ const questionBank: Record<string, { topics: string[]; prompts: string[] }> = {
 
 export const questionRows: QuestionRow[] = exams.flatMap((exam) => {
   const course = courseCatalog.find((c) => c.id === exam.courseId)!;
-  const bank = questionBank[course.programId] ?? questionBank[ACADEMIC_AFFAIRS_SCOPE_ID]!;
+  const bank =
+    questionBank[course.programId] ?? questionBank[ACADEMIC_AFFAIRS_SCOPE_ID]!;
   return Array.from({ length: Math.min(12, exam.questionCount) }, (_, qi) => ({
     id: `${exam.id}-q${qi + 1}`,
     examId: exam.id,
@@ -1082,7 +1545,9 @@ export const questionRows: QuestionRow[] = exams.flatMap((exam) => {
 export const questions: QuestionItem[] = questionRows.map((row) => {
   const exam = exams.find((e) => e.id === row.examId)!;
   const pctCorrect = Math.round(clamp(normal(66, 17), 12, 98));
-  const discrimination = Number(clamp(normal(0.34, 0.16), -0.12, 0.72).toFixed(2));
+  const discrimination = Number(
+    clamp(normal(0.34, 0.16), -0.12, 0.72).toFixed(2),
+  );
   return {
     id: row.id,
     examId: row.examId,
@@ -1103,14 +1568,70 @@ export const questions: QuestionItem[] = questionRows.map((row) => {
  * ------------------------------------------------------------------------- */
 
 export const userAccounts: UserAccountRow[] = [
-  { id: "u-president", personId: "p-priya-raman", role: "senior_management", scopeId: UNIVERSITY_SCOPE_ID, studentId: null, isDemo: true },
-  { id: "u-vp-aa", personId: "p-karim-fawzy", role: "senior_management", scopeId: UNIVERSITY_SCOPE_ID, studentId: null, isDemo: true },
-  { id: "u-dean-eng", personId: "p-hana-elmasry", role: "senior_management", scopeId: "sec-engineering", studentId: null, isDemo: true },
-  { id: "u-pd-cs", personId: "p-daniel-osei", role: "program_director", scopeId: ACADEMIC_AFFAIRS_SCOPE_ID, studentId: null, isDemo: true },
-  { id: "u-aa-cs", personId: "p-sara-mansour", role: "academic_affairs", scopeId: ACADEMIC_AFFAIRS_SCOPE_ID, studentId: null, isDemo: true },
-  { id: "u-prof-cs", personId: "p-tomas-oyelaran", role: "professor", scopeId: ACADEMIC_AFFAIRS_SCOPE_ID, studentId: null, isDemo: true },
-  { id: "u-it-integrity", personId: "p-layla-nasser", role: "it_academic_integrity", scopeId: null, studentId: null, isDemo: true },
-  { id: "u-student", personId: studentRows.find((s) => s.id === currentStudentId)!.personId, role: "student", scopeId: ACADEMIC_AFFAIRS_SCOPE_ID, studentId: currentStudentId, isDemo: true },
+  {
+    id: "u-president",
+    personId: "p-priya-raman",
+    role: "senior_management",
+    scopeId: UNIVERSITY_SCOPE_ID,
+    studentId: null,
+    isDemo: true,
+  },
+  {
+    id: "u-vp-aa",
+    personId: "p-karim-fawzy",
+    role: "senior_management",
+    scopeId: UNIVERSITY_SCOPE_ID,
+    studentId: null,
+    isDemo: true,
+  },
+  {
+    id: "u-dean-eng",
+    personId: "p-hana-elmasry",
+    role: "senior_management",
+    scopeId: "sec-engineering",
+    studentId: null,
+    isDemo: true,
+  },
+  {
+    id: "u-pd-cs",
+    personId: "p-daniel-osei",
+    role: "program_director",
+    scopeId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    studentId: null,
+    isDemo: true,
+  },
+  {
+    id: "u-aa-cs",
+    personId: "p-sara-mansour",
+    role: "academic_affairs",
+    scopeId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    studentId: null,
+    isDemo: true,
+  },
+  {
+    id: "u-prof-cs",
+    personId: "p-tomas-oyelaran",
+    role: "professor",
+    scopeId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    studentId: null,
+    isDemo: true,
+  },
+  {
+    id: "u-it-integrity",
+    personId: "p-layla-nasser",
+    role: "it_academic_integrity",
+    scopeId: null,
+    studentId: null,
+    isDemo: true,
+  },
+  {
+    id: "u-student",
+    personId: studentRows.find((s) => s.id === currentStudentId)!.personId,
+    role: "student",
+    scopeId: ACADEMIC_AFFAIRS_SCOPE_ID,
+    studentId: currentStudentId,
+    isDemo: true,
+  },
 ];
 
 export const demoUsers: DemoUser[] = userAccounts.map((account) => {
@@ -1123,11 +1644,13 @@ export const demoUsers: DemoUser[] = userAccounts.map((account) => {
     account.role === "student"
       ? "BSc Year 3 · Computer Science"
       : account.role === "professor"
-        ? `Professor · ${courses
-            .filter((c) => assigned.includes(c.id))
-            .map((c) => c.code)
-            .join(", ") || "CS 201"}`
-        : staffTitle ?? person.fullName;
+        ? `Professor · ${
+            courses
+              .filter((c) => assigned.includes(c.id))
+              .map((c) => c.code)
+              .join(", ") || "CS 201"
+          }`
+        : (staffTitle ?? person.fullName);
   return {
     id: account.id,
     name: person.fullName,
@@ -1135,12 +1658,15 @@ export const demoUsers: DemoUser[] = userAccounts.map((account) => {
     initials: initialsOf(person.fullName),
     role: account.role,
     scopeId: account.scopeId,
-    ...(assigned.length && account.role === "professor" ? { courseIds: assigned.filter((id) => id === "c1") } : {}),
+    ...(assigned.length && account.role === "professor"
+      ? { courseIds: assigned.filter((id) => id === "c1") }
+      : {}),
     ...(account.studentId ? { studentId: account.studentId } : {}),
   };
 });
 
-export function demoUserById(id: string): DemoUser | undefined {
+export function demoUserById(id: string | null): DemoUser | undefined {
+  if (!id) return undefined;
   return demoUsers.find((u) => u.id === id);
 }
 
@@ -1214,17 +1740,26 @@ studentRows.forEach((student, si) => {
     const yearLevel = yi + 1;
     let list = catalogFor(student.programId, yearLevel);
     if (list.length === 0) {
-      list = courseCatalog.filter(
-        (c) => c.programId === student.programId && !currentCourseIds.has(c.id),
-      ).slice(0, 3);
+      list = courseCatalog
+        .filter(
+          (c) =>
+            c.programId === student.programId && !currentCourseIds.has(c.id),
+        )
+        .slice(0, 3);
     }
     if (list.length === 0) {
-      list = courseCatalog.filter((c) => c.programId === student.programId).slice(0, 3);
+      list = courseCatalog
+        .filter((c) => c.programId === student.programId)
+        .slice(0, 3);
     }
     list.forEach((course, ci) => {
       const average = Number(
         clamp(
-          62 + (ability[si] ?? 0) + yi * 3 + ((ci * 11 + si * 3 + yi * 5) % 15) - 7,
+          62 +
+            (ability[si] ?? 0) +
+            yi * 3 +
+            ((ci * 11 + si * 3 + yi * 5) % 15) -
+            7,
           32,
           98,
         ).toFixed(1),
@@ -1244,11 +1779,15 @@ studentRows.forEach((student, si) => {
 
 function currentYearCourses(studentId: string): YearCourseGrade[] {
   const ownEnrollments = enrollments.filter(
-    (e) => e.studentId === studentId && e.academicYearId === CURRENT_ACADEMIC_YEAR_ID,
+    (e) =>
+      e.studentId === studentId &&
+      e.academicYearId === CURRENT_ACADEMIC_YEAR_ID,
   );
   return ownEnrollments.map((enrollment) => {
     const course = courses.find((c) => c.id === enrollment.courseId)!;
-    const examIds = exams.filter((e) => e.courseId === course.id).map((e) => e.id);
+    const examIds = exams
+      .filter((e) => e.courseId === course.id)
+      .map((e) => e.id);
     const scores = attempts
       .filter(
         (a) =>
@@ -1298,7 +1837,9 @@ students.forEach((student, si) => {
         Math.max(1, courseList.length)
       ).toFixed(1),
     );
-    const classAverage = Number((67 + yi * 1.4 + (yi % 2 === 0 ? -0.8 : 0.6)).toFixed(1));
+    const classAverage = Number(
+      (67 + yi * 1.4 + (yi % 2 === 0 ? -0.8 : 0.6)).toFixed(1),
+    );
     const ownAttempts = attempts.filter(
       (a) => a.studentId === student.id && a.participated,
     );

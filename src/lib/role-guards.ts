@@ -1,5 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 import type { Role } from "./types";
+import { getAuthToken, roleFromToken, userIdFromToken } from "./auth-token";
 
 export const roleHome: Record<Role, string> = {
   senior_management: "/management",
@@ -10,60 +11,15 @@ export const roleHome: Record<Role, string> = {
   student: "/my-progress",
 };
 
-/**
- * Client-readable demo session store. RoleProvider writes here on switch so
- * route `beforeLoad` guards can read the active role without React context.
- * In production this comes from the verified session cookie / JWT.
- */
-let activeDemoRole: Role = "senior_management";
-let activeDemoUserId = "u-president";
+export const roleRoutes = roleHome;
 
-export function setActiveDemoRole(role: Role) {
-  activeDemoRole = role;
-  if (typeof window !== "undefined") {
-    try {
-      window.sessionStorage.setItem("bnu-demo-role", role);
-    } catch {
-      /* ignore */
-    }
-  }
+/** Gets role from the JWT in localStorage or the auth cookie. */
+export function getActiveDemoRole(): Role | null {
+  return roleFromToken(getAuthToken());
 }
 
-export function setActiveDemoUserId(userId: string) {
-  activeDemoUserId = userId;
-  if (typeof window !== "undefined") {
-    try {
-      window.sessionStorage.setItem("bnu-demo-user", userId);
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-export function getActiveDemoRole(): Role {
-  if (typeof window !== "undefined") {
-    try {
-      const stored = window.sessionStorage.getItem(
-        "bnu-demo-role",
-      ) as Role | null;
-      if (stored) return stored;
-    } catch {
-      /* ignore */
-    }
-  }
-  return activeDemoRole;
-}
-
-export function getActiveDemoUserId(): string {
-  if (typeof window !== "undefined") {
-    try {
-      const stored = window.sessionStorage.getItem("bnu-demo-user");
-      if (stored) return stored;
-    } catch {
-      /* ignore */
-    }
-  }
-  return activeDemoUserId;
+export function getActiveDemoUserId(): string | null {
+  return userIdFromToken(getAuthToken());
 }
 
 /** Paths each role_type may open. Homes are always included via roleHome. */
@@ -82,10 +38,7 @@ export const allowedRolesByPath: Record<string, Role[]> = {
   "/professor": ["professor"],
   "/integrity": ["it_academic_integrity", "senior_management"],
   "/my-progress": ["student"],
-  "/exam-activity": [
-    "senior_management",
-    "program_director",
-  ],
+  "/exam-activity": ["senior_management", "program_director"],
   "/courses": [
     "senior_management",
     "program_director",
@@ -122,10 +75,11 @@ export function rolesAllowedForPath(pathname: string): Role[] | undefined {
   return undefined;
 }
 
-export function assertRoleAccess(
-  pathname: string,
-  role: Role = getActiveDemoRole(),
-) {
+export function assertRoleAccess(pathname: string, role: Role | null) {
+  if (!role) {
+    throw redirect({ to: "/login" });
+  }
+
   const allowed = rolesAllowedForPath(pathname);
   if (!allowed) return;
   if (!allowed.includes(role)) {
@@ -136,6 +90,7 @@ export function assertRoleAccess(
 /** Factory for route beforeLoad guards. */
 export function roleGuard(pathname: string) {
   return () => {
+    if (typeof window === "undefined") return;
     assertRoleAccess(pathname, getActiveDemoRole());
   };
 }

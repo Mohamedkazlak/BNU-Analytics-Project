@@ -12,6 +12,8 @@ import {
 } from "./role-context";
 import type { DemoUser } from "@/lib/types";
 import bnuMark from "@/assets/bnu-mark.png.asset.json";
+import { clearAuthToken } from "@/lib/auth-token";
+import { rolesAllowedForPath } from "@/lib/role-guards";
 
 function AffiliationParts({ user }: { user: DemoUser }) {
   const affiliation = affiliationForScope(user.scopeId);
@@ -43,16 +45,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     .flatMap((g) => g.items)
     .find((item) => item.to === pathname);
 
-  // Deep-linking into another role's report switches the role context to match.
+  // Deep-linking into another role's report sends the user to their own home.
   useEffect(() => {
-    if (
-      ownerUser &&
-      ownerUser.role !== role &&
-      !navByRole[role].some((g) => g.items.some((i) => i.to === pathname))
-    ) {
-      setUser(ownerUser.id);
+    const allowed = rolesAllowedForPath(pathname);
+    if (allowed && !allowed.includes(role)) {
+      void navigate({ to: roleHome[role] });
     }
-  }, [ownerUser, pathname, role, setUser]);
+  }, [navigate, pathname, role]);
 
   const switchUser = (next: DemoUser) => {
     setUser(next.id);
@@ -166,64 +165,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <button
-                  onClick={() => setOpen((v) => !v)}
-                  className="flex max-w-[min(100vw-8rem,22rem)] items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-[12px] font-medium text-ink backdrop-blur-xl"
-                >
-                  <span className="shrink-0 font-semibold text-iris">
-                    {displayRole}
-                  </span>
-                  <span className="hidden truncate sm:inline">
-                    <AffiliationParts user={user} />
-                  </span>
-                  <span className="text-ink-soft">▾</span>
-                </button>
-                {open && (
-                  <div className="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-white/80 bg-white/90 p-1.5 backdrop-blur-xl">
-                    {demoUsers.map((u) => {
-                      const label = displayRoleLabel(u);
-                      const aff = affiliationForScope(u.scopeId);
-                      const active = u.id === user.id;
-                      return (
-                        <button
-                          key={u.id}
-                          onClick={() => switchUser(u)}
-                          className={cn(
-                            "flex w-full flex-col rounded-xl px-3 py-2 text-left",
-                            active ? "bg-iris/10" : "hover:bg-white",
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={cn(
-                                "text-[12px] font-semibold",
-                                active ? "text-iris" : "text-ink",
-                              )}
-                            >
-                              {label}
-                            </span>
-                            {active && <span className="text-iris">•</span>}
-                          </div>
-                          <span className="mt-0.5 text-[11px] text-ink-soft">
-                            {u.name}
-                            {" · "}
-                            {aff.sector || aff.college ? (
-                              <>
-                                {aff.sector}
-                                {aff.sector && aff.college ? " · " : ""}
-                                {aff.college}
-                              </>
-                            ) : (
-                              aff.label
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => {
+                  clearAuthToken();
+                  window.location.href = "/login";
+                }}
+                className="flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-[12px] font-semibold text-iris backdrop-blur-xl hover:bg-white"
+              >
+                Log out
+              </button>
               {role !== "student" && (
                 <button className="rounded-full bg-iris px-4 py-2 text-[12px] font-semibold text-white shadow-lg shadow-iris/25">
                   Export Report

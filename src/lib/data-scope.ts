@@ -81,9 +81,11 @@ export function viewerScopeFor(user: DemoUser): ViewerScope {
 }
 
 export function getActiveViewerScope(): ViewerScope {
-  const user =
-    demoUserById(getActiveDemoUserId()) ??
-    demoUserForRole(getActiveDemoRole());
+  const userId = getActiveDemoUserId();
+  const role = getActiveDemoRole();
+  const user = userId
+    ? (demoUserById(userId) ?? demoUserForRole(role || "senior_management"))
+    : demoUserForRole("senior_management");
   return viewerScopeFor(user);
 }
 

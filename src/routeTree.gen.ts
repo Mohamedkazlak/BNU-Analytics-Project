@@ -15,6 +15,7 @@ import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as ExamActivityRouteImport } from './routes/exam-activity'
 import { Route as IntegrityRouteImport } from './routes/integrity'
 import { Route as ItemAnalysisRouteImport } from './routes/item-analysis'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ManagementRouteImport } from './routes/management'
 import { Route as MyProgressRouteImport } from './routes/my-progress'
 import { Route as ParticipationRouteImport } from './routes/participation'
@@ -53,6 +54,11 @@ const IntegrityRoute = IntegrityRouteImport.update({
 const ItemAnalysisRoute = ItemAnalysisRouteImport.update({
   id: '/item-analysis',
   path: '/item-analysis',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ManagementRoute = ManagementRouteImport.update({
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/exam-activity': typeof ExamActivityRoute
   '/integrity': typeof IntegrityRoute
   '/item-analysis': typeof ItemAnalysisRoute
+  '/login': typeof LoginRoute
   '/management': typeof ManagementRoute
   '/my-progress': typeof MyProgressRoute
   '/participation': typeof ParticipationRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/exam-activity': typeof ExamActivityRoute
   '/integrity': typeof IntegrityRoute
   '/item-analysis': typeof ItemAnalysisRoute
+  '/login': typeof LoginRoute
   '/management': typeof ManagementRoute
   '/my-progress': typeof MyProgressRoute
   '/participation': typeof ParticipationRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/exam-activity': typeof ExamActivityRoute
   '/integrity': typeof IntegrityRoute
   '/item-analysis': typeof ItemAnalysisRoute
+  '/login': typeof LoginRoute
   '/management': typeof ManagementRoute
   '/my-progress': typeof MyProgressRoute
   '/participation': typeof ParticipationRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/exam-activity'
     | '/integrity'
     | '/item-analysis'
+    | '/login'
     | '/management'
     | '/my-progress'
     | '/participation'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/exam-activity'
     | '/integrity'
     | '/item-analysis'
+    | '/login'
     | '/management'
     | '/my-progress'
     | '/participation'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/exam-activity'
     | '/integrity'
     | '/item-analysis'
+    | '/login'
     | '/management'
     | '/my-progress'
     | '/participation'
@@ -214,6 +226,7 @@ export interface RootRouteChildren {
   ExamActivityRoute: typeof ExamActivityRoute
   IntegrityRoute: typeof IntegrityRoute
   ItemAnalysisRoute: typeof ItemAnalysisRoute
+  LoginRoute: typeof LoginRoute
   ManagementRoute: typeof ManagementRoute
   MyProgressRoute: typeof MyProgressRoute
   ParticipationRoute: typeof ParticipationRoute
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/item-analysis'
       fullPath: '/item-analysis'
       preLoaderRoute: typeof ItemAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/management': {
@@ -342,6 +362,7 @@ const rootRouteChildren: RootRouteChildren = {
   ExamActivityRoute: ExamActivityRoute,
   IntegrityRoute: IntegrityRoute,
   ItemAnalysisRoute: ItemAnalysisRoute,
+  LoginRoute: LoginRoute,
   ManagementRoute: ManagementRoute,
   MyProgressRoute: MyProgressRoute,
   ParticipationRoute: ParticipationRoute,
