@@ -1,5 +1,6 @@
 # Dependencies
 node_modules
+backend/venv
 
 # Build and generated output
 dist
@@ -8,6 +9,12 @@ dist
 .tanstack
 .wrangler
 .vite
+
+# Python cache / generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
 
 # Environment
 .env
@@ -22,3 +29,4 @@ API_AND_ROUTES.md
 # OS / editor
 .DS_Store
 .idea
+.vscode
