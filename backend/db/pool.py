@@ -1,40 +1,48 @@
-from fastapi import Request
-import asyncpg
-from core.config import settings
 from urllib.parse import urlparse, urlunparse
 
+import asyncpg
+from fastapi import Request
+
+from core.config import settings
+
+
 def get_app_user_db_url(url: str) -> str:
+    """Replace the database username with the configured application user.
+
+    The password is intentionally not embedded in source code. For Supabase
+    pooler URLs, the project reference is retained in the username format.
+    """
     parsed = urlparse(url)
-    if parsed.scheme in ("postgres", "postgresql"):
-        original_user = parsed.username
-        new_user = "app_user"
-        if original_user and "." in original_user:
-            # Supabase connection pooler format: user.project_ref
-            project_ref = original_user.split(".", 1)[1]
-            new_user = f"app_user.{project_ref}"
-        
-        netloc = f"{new_user}:app_user_password_demo_123@{parsed.hostname}"
-        if parsed.port:
-            netloc += f":{parsed.port}"
-        parsed = parsed._replace(netloc=netloc)
-        return urlunparse(parsed)
-    return url
+    if parsed.scheme not in ("postgres", "postgresql"):
+        return url
+
+    original_user = parsed.username
+    new_user = "app_user"
+    if original_user and "." in original_user:
+        project_ref = original_user.split(".", 1)[1]
+        new_user = f"app_user.{project_ref}"
+
+    # Preserve the configured password from DATABASE_URL.
+    password = parsed.password or ""
+    host = parsed.hostname or "localhost"
+    netloc = f"{new_user}:{password}@{host}"
+    if parsed.port:
+        netloc += f":{parsed.port}"
+    return urlunparse(parsed._replace(netloc=netloc))
+
 
 async def create_pool():
-    # Use app_user for the connection pool
-    pool_url = get_app_user_db_url(settings.DATABASE_URL)
-    return await asyncpg.create_pool(pool_url)
+    return await asyncpg.create_pool(get_app_user_db_url(settings.DATABASE_URL))
+
 
 async def get_db_conn(request: Request):
-    """
-    Dependency that acquires a connection from the pool, begins a transaction,
-    and sets `app.current_user_id` if the user is authenticated.
-    """
+    """Acquire a connection and set the transaction-local user context."""
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
             user_ctx = getattr(request.state, "user", None)
             if user_ctx:
                 await connection.execute(
-                    "SELECT set_config('app.current_user_id', $1, true)", user_ctx.user_id
+                    "SELECT set_config('app.current_user_id', $1, true)",
+                    user_ctx.user_id,
                 )
             yield connection

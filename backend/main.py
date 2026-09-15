@@ -1,8 +1,10 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from core.config import settings
 from db.pool import create_pool
 from routers import (
     auth,
@@ -26,14 +28,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     await app.state.pool.close()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="BNU Analytics API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(auth.router)
