@@ -7,8 +7,6 @@
 -- imported. This migration does not infer requirement level from year_level,
 -- course codes, course names, or demo course IDs.
 
-begin;
-
 do $$
 declare
   col_udt text;
@@ -71,5 +69,3 @@ comment on column courses.counted_in_cumulative_gpa is
   'When false the course is excluded from cumulative GPA. Independent of pass_fail_subject.';
 comment on column courses.pass_fail_subject is
   'When true the course does not contribute letter-grade quality points to cumulative GPA.';
-
-commit;

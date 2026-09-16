@@ -1,7 +1,7 @@
 -- Backfill deterministic item-level answers for synthetic attempts so item
 -- analysis has real data instead of an empty attempt_answers table.
-
-begin;
+-- Only synthetic attempts are eligible. Do not fabricate answers for
+-- unspecified or imported exams.
 
 insert into attempt_answers (attempt_id, question_id, is_correct, points, is_synthetic)
 select
@@ -19,6 +19,5 @@ select
 from exam_attempts a
 join questions q on q.exam_id = a.exam_id
 where a.status <> 'absent'
+  and a.is_synthetic
 on conflict do nothing;
-
-commit;

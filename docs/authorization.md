@@ -64,9 +64,12 @@ visible students, and staff/instructors in visible org units or courses.
 
 The API must connect as a non-`BYPASSRLS` role. In production the process
 refuses to start if `DATABASE_URL` is a superuser / BYPASSRLS role (including
-Supabase `postgres`). Set `DATABASE_URL` to `app_user` (or
-`app_user.<project-ref>` on the Supabase pooler) after an operator sets that
-role’s password out of band. Migrations may use `DATABASE_ADMIN_URL`.
+Supabase `postgres`). Copy the host’s connection string for `app_user` into
+`DATABASE_URL` after an operator sets that role’s password out of band. Direct
+Postgres uses `app_user`. Some poolers (including Supabase Supavisor) append
+`.<project-ref>` to the username — use that form only when the dashboard
+shows it. The API does not rewrite usernames. Migrations may use
+`DATABASE_ADMIN_URL`.
 
 CI integration tests create a disposable Postgres database and exercise RLS
 with `SET app.current_user_id`.

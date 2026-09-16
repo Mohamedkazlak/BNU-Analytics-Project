@@ -38,10 +38,11 @@ and again in PostgreSQL RLS.
 
 ## Database connection
 
-`DATABASE_URL` is used as supplied. The process does not rewrite the username
-to `app_user` / `app_user.<project-ref>`. In production the connected role
-must not have `BYPASSRLS` (Supabase `postgres` does). Create `app_user`, set
-its password out of band, and put that role in `DATABASE_URL`. Migrations
+`DATABASE_URL` is used as supplied. The process does not rewrite the username.
+In production the connected role must not have `BYPASSRLS` (Supabase `postgres`
+does). Create `app_user`, set its password out of band, and put that role in
+`DATABASE_URL` using the exact username your host documents (direct connections
+typically use `app_user`; a pooler may require a different form). Migrations
 that need DDL should use `DATABASE_ADMIN_URL`.
 
 ## Analytics filters

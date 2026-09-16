@@ -2,8 +2,6 @@
 -- current_app_account(), and constrain get_exam_averages() to visible exams.
 -- Idempotent: CREATE OR REPLACE + DROP POLICY IF EXISTS.
 
-begin;
-
 create or replace function current_app_account()
 returns user_accounts
 language plpgsql
@@ -191,12 +189,55 @@ create policy staff_read on staff
     )
   );
 
+revoke all on function org_descendants(text) from public;
+revoke all on function current_app_account() from public;
+revoke all on function current_visible_program_ids() from public;
 revoke all on function org_unit_is_visible(text) from public;
-grant execute on function org_unit_is_visible(text) to app_user;
+revoke all on function current_professor_course_ids() from public;
+revoke all on function current_student_course_ids() from public;
+revoke all on function student_is_visible(text) from public;
+revoke all on function course_is_visible(text) from public;
+revoke all on function offering_is_visible(text) from public;
+revoke all on function exam_is_visible(text) from public;
+revoke all on function exam_attempt_is_visible(text, text) from public;
+revoke all on function attempt_is_visible(text) from public;
+revoke all on function exam_class_average(text) from public;
+revoke all on function get_user_for_login(text) from public;
+revoke all on function get_exam_averages(text[]) from public;
+
+grant execute on function org_descendants(text) to app_user;
 grant execute on function current_app_account() to app_user;
+grant execute on function current_visible_program_ids() to app_user;
+grant execute on function org_unit_is_visible(text) to app_user;
+grant execute on function current_professor_course_ids() to app_user;
+grant execute on function current_student_course_ids() to app_user;
+grant execute on function student_is_visible(text) to app_user;
+grant execute on function course_is_visible(text) to app_user;
+grant execute on function offering_is_visible(text) to app_user;
+grant execute on function exam_is_visible(text) to app_user;
+grant execute on function exam_attempt_is_visible(text, text) to app_user;
+grant execute on function attempt_is_visible(text) to app_user;
+grant execute on function exam_class_average(text) to app_user;
+grant execute on function get_user_for_login(text) to app_user;
 grant execute on function get_exam_averages(text[]) to app_user;
+
+do $$
+begin
+  if exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'rls_auto_enable'
+      and pg_get_function_identity_arguments(p.oid) = ''
+  ) then
+    execute 'revoke all on function rls_auto_enable() from public';
+  end if;
+end $$;
 
 comment on function org_unit_is_visible(text) is
   'Whether the session role may see this org_units row. SECURITY DEFINER, RLS off.';
 
-commit;
+-- Analytics is read-only. Tighten leftover DML grants from older helper scripts.
+revoke insert, update, delete on all tables in schema public from app_user;
+grant select on all tables in schema public to app_user;

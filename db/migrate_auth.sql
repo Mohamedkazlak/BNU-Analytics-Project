@@ -1,3 +1,8 @@
+-- LEGACY — do not apply on production.
+-- This script predates db/schema.sql and db/migrations/. It embeds a demo
+-- password and grants INSERT/UPDATE/DELETE to app_user. Use schema.sql plus
+-- python backend/run_migration.py instead. Set app_user's password out of band.
+
 -- 1. Add password hash column
 ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS password_hash TEXT;
 

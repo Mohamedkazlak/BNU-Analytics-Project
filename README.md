@@ -99,8 +99,8 @@ python backend/run_migration.py
 ```
 
 The runner records versions in `schema_migrations` and will not re-apply a
-file. `DATABASE_URL` / `DATABASE_ADMIN_URL` are required. Do not commit
-credentials.
+file. It owns the transaction for each file. `DATABASE_URL` /
+`DATABASE_ADMIN_URL` are required. Do not commit credentials.
 
 ## Tests
 

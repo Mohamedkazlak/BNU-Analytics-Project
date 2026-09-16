@@ -1,8 +1,6 @@
 -- Expose sector_id / program_id on v_exam_attempts so analytics queries can
 -- filter in SQL without re-joining org_units on every request.
 
-begin;
-
 drop view if exists v_exam_attempts;
 create view v_exam_attempts
   with (security_invoker = true)
@@ -44,5 +42,3 @@ begin
     grant select on v_exam_attempts to app_user;
   end if;
 end $$;
-
-commit;

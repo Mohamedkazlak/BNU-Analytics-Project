@@ -75,8 +75,9 @@ python backend/run_migration.py
 ```
 
 The runner records applied files in `public.schema_migrations` and applies
-each version once, in a transaction. Use `DATABASE_ADMIN_URL` if
-`DATABASE_URL` is the least-privilege app role.
+each version once, in a transaction it owns. Migration files must not
+`BEGIN`/`COMMIT` themselves. Use `DATABASE_ADMIN_URL` if `DATABASE_URL` is
+the least-privilege app role.
 
 Migrations:
 
@@ -87,6 +88,8 @@ Migrations:
 5. `005_auth_and_exam_average_helpers.sql`
 6. `006_synthetic_item_answers.sql`
 7. `007_org_unit_rls_and_helpers.sql` — scoped org-unit RLS and helper hardening
+8. `008_revoke_anon_execute_on_helpers.sql` — drop PostgREST EXECUTE on SECURITY DEFINER helpers
+9. `009_disable_schema_migrations_rls.sql` — operator history table is not an app relation
 
 ## Views
 

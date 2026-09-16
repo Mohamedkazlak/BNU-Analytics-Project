@@ -19,7 +19,8 @@
 -- Fresh install:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/schema.sql
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/seed.sql
--- Existing databases: apply files in db/migrations/ in numeric order.
+-- Existing databases: python backend/run_migration.py (the runner owns the
+-- transaction; files in db/migrations/ must not BEGIN/COMMIT themselves).
 
 begin;
 
@@ -1169,6 +1170,7 @@ $$;
 
 grant usage on schema public to app_user;
 grant select on all tables in schema public to app_user;
+revoke insert, update, delete on all tables in schema public from app_user;
 alter default privileges in schema public grant select on tables to app_user;
 
 alter table org_units force row level security;

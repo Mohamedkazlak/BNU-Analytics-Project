@@ -193,12 +193,16 @@ def migrated_db(tmp_path_factory):
     )
     if runner.returncode != 0:
         pytest.fail(f"migration runner failed:\n{runner.stdout}\n{runner.stderr}")
+    if "already a transaction in progress" in (runner.stderr or "").lower():
+        pytest.fail(f"nested transaction while migrating:\n{runner.stderr}")
     _prepare_app_user(url)
     yield url
 
 
 def test_fresh_schema_curriculum_is_text_college(fresh_db):
     assert _column_udt(fresh_db, "courses", "requirement_level_type") == "text"
+    assert _column_udt(fresh_db, "courses", "counted_in_cumulative_gpa") == "bool"
+    assert _column_udt(fresh_db, "courses", "pass_fail_subject") == "bool"
     rows = asyncio.run(
         _fetch(
             fresh_db,
@@ -206,15 +210,115 @@ def test_fresh_schema_curriculum_is_text_college(fresh_db):
         )
     )
     assert [r["v"] for r in rows] == ["college"]
-    assert "org_unit_is_visible" in _policy_qual(fresh_db, "org_units", "org_units_read")
+    assert "org_unit_is_visible" in _policy_qual(
+        fresh_db, "org_units", "org_units_read"
+    )
+    tables = asyncio.run(
+        _fetch(
+            fresh_db,
+            """
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema='public' AND table_name='schema_migrations'
+            """,
+        )
+    )
+    assert tables
 
 
 def test_migrated_schema_matches_fresh_curriculum_and_org_policy(fresh_db, migrated_db):
     assert _column_udt(migrated_db, "courses", "requirement_level_type") == "text"
+    assert _column_udt(migrated_db, "courses", "counted_in_cumulative_gpa") == "bool"
+    assert _column_udt(migrated_db, "courses", "pass_fail_subject") == "bool"
     assert "org_unit_is_visible" in _policy_qual(
         migrated_db, "org_units", "org_units_read"
     )
-    assert "org_unit_is_visible" in _policy_qual(fresh_db, "org_units", "org_units_read")
+    assert "org_unit_is_visible" in _policy_qual(
+        fresh_db, "org_units", "org_units_read"
+    )
+    versions = asyncio.run(
+        _fetch(
+            migrated_db,
+            "SELECT version FROM public.schema_migrations ORDER BY version",
+        )
+    )
+    assert [r["version"] for r in versions] == [
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+        "006",
+        "007",
+        "008",
+        "009",
+    ]
+    sector_col = asyncio.run(
+        _fetch(
+            migrated_db,
+            """
+            SELECT column_name FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='v_exam_attempts'
+              AND column_name IN ('sector_id', 'program_id')
+            ORDER BY 1
+            """,
+        )
+    )
+    assert [r["column_name"] for r in sector_col] == ["program_id", "sector_id"]
+
+
+def test_migration_runner_skips_already_applied(migrated_db):
+    env = os.environ.copy()
+    env["DATABASE_ADMIN_URL"] = migrated_db
+    env["DATABASE_URL"] = migrated_db
+    runner = subprocess.run(
+        [sys.executable, str(ROOT / "backend" / "run_migration.py")],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert runner.returncode == 0, runner.stderr
+    assert "already a transaction in progress" not in runner.stderr
+    assert "skip 001_curriculum_metadata.sql (already applied)" in runner.stdout
+    assert "skip 007_org_unit_rls_and_helpers.sql (already applied)" in runner.stdout
+    assert (
+        "skip 008_revoke_anon_execute_on_helpers.sql (already applied)" in runner.stdout
+    )
+    assert (
+        "skip 009_disable_schema_migrations_rls.sql (already applied)" in runner.stdout
+    )
+    assert not any(line.startswith("applied ") for line in runner.stdout.splitlines())
+
+
+def test_failed_migration_rolls_back_and_is_not_recorded(tmp_path):
+    _require_admin()
+    dbname = "bnu_analytics_ci_migfail"
+    _recreate(dbname)
+    url = _db_url(dbname)
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    (migrations / "001_ok.sql").write_text("create table mig_ok (id int);")
+    (migrations / "002_bad.sql").write_text(
+        "create table mig_bad (id int);\nselect 1 / 0;"
+    )
+    from run_migration import apply_migrations
+
+    with pytest.raises(Exception):
+        asyncio.run(apply_migrations(url, migrations))
+
+    recorded = asyncio.run(
+        _fetch(url, "SELECT version FROM public.schema_migrations ORDER BY version")
+    )
+    assert [r["version"] for r in recorded] == ["001"]
+    present = asyncio.run(
+        _fetch(
+            url,
+            "SELECT to_regclass('public.mig_ok') AS ok, to_regclass('public.mig_bad') AS bad",
+        )
+    )
+    assert present[0]["ok"] == "mig_ok"
+    assert present[0]["bad"] is None
 
 
 def test_rls_student_cannot_see_other_students(fresh_db):
@@ -277,7 +381,11 @@ def test_rls_university_sm_sees_all_sectors(fresh_db):
 
 def test_rls_it_does_not_see_transcripts(fresh_db):
     rows = asyncio.run(
-        _fetch_as_app(FRESH_DB, "u-it-integrity", "SELECT count(*)::int AS n FROM transcript_entries")
+        _fetch_as_app(
+            FRESH_DB,
+            "u-it-integrity",
+            "SELECT count(*)::int AS n FROM transcript_entries",
+        )
     )
     assert rows[0]["n"] == 0
 
@@ -307,30 +415,47 @@ def test_http_student_and_professor_scope(fresh_db):
     from main import app
 
     with TestClient(app) as client:
-        denied = client.post("/auth/login", json={"id": "u-student", "password": "wrong"})
+        denied = client.post(
+            "/auth/login", json={"id": "u-student", "password": "wrong"}
+        )
         assert denied.status_code == 401
-        login = client.post("/auth/login", json={"id": "u-student", "password": "test-pass"})
+        login = client.post(
+            "/auth/login", json={"id": "u-student", "password": "test-pass"}
+        )
         assert login.status_code == 200, login.text
         headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
         assert client.get("/api/student-dashboard", headers=headers).status_code == 200
         assert (
-            client.get("/api/student-dashboard?studentId=s70", headers=headers).status_code
+            client.get(
+                "/api/student-dashboard?studentId=s70", headers=headers
+            ).status_code
             == 403
         )
         assert client.get("/api/students/s70", headers=headers).status_code == 403
         assert (
-            client.get("/api/student-performance?studentId=s70", headers=headers).status_code
+            client.get(
+                "/api/student-performance?studentId=s70", headers=headers
+            ).status_code
             == 403
         )
         assert (
-            client.get("/api/student-directory?studentId=s70", headers=headers).status_code
+            client.get(
+                "/api/student-directory?studentId=s70", headers=headers
+            ).status_code
             == 403
         )
 
-        prof = client.post("/auth/login", json={"id": "u-prof-cs", "password": "test-pass"})
+        prof = client.post(
+            "/auth/login", json={"id": "u-prof-cs", "password": "test-pass"}
+        )
         assert prof.status_code == 200
         pheaders = {"Authorization": f"Bearer {prof.json()['access_token']}"}
         allowed = client.get("/api/students/s7", headers=pheaders)
         assert allowed.status_code == 200
         assert client.get("/api/students/s70", headers=pheaders).status_code == 403
-        assert client.get("/api/filter-options?curriculumId=c10", headers=pheaders).status_code == 403
+        assert (
+            client.get(
+                "/api/filter-options?curriculumId=c10", headers=pheaders
+            ).status_code
+            == 403
+        )

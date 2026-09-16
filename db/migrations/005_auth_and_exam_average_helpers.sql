@@ -1,8 +1,6 @@
 -- Fold login helper, corrected class-average helper, FORCE RLS, and grants
 -- into an incremental migration for databases created from older schema.sql.
 
-begin;
-
 alter table user_accounts add column if not exists password_hash text;
 
 create or replace function get_user_for_login(p_id text)
@@ -93,5 +91,3 @@ grant execute on function get_exam_averages(text[]) to app_user;
 -- app_user is created without a password. Do not point DATABASE_URL at it
 -- until an operator has set a password out of band. The API uses DATABASE_URL
 -- as supplied and does not rewrite the username to app_user.
-
-commit;
