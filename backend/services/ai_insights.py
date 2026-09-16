@@ -1,52 +1,55 @@
-"""Phase 1 AI layer: real numbers from the existing (already scope-filtered,
-RLS-backed) repositories, plugged into narrative templates. No LLM call yet —
-see backend/core/llm_client.py (Phase 2) for where generation will attach.
+"""Template AI layer over shared, filter-scoped analytics.
 
-Every headline/body/row here must trace back to a real row returned by one
-of the repositories/*.py modules already used by the dashboards. Where the
-underlying data doesn't exist yet (e.g. attempt_answers is currently empty,
-so item-level analysis has nothing to show), we say so explicitly instead of
-inventing a plausible-looking number.
+Narratives are generated from repository numbers only. No LLM is called.
 """
 
+from __future__ import annotations
+
+import asyncio
+from typing import Any, Optional
+
 import asyncpg
-from schemas.auth import UserContext
+
+from core.config import settings
 from core.utils import PASS_MARK
-
-import repositories.management as mgmt_repo
-import repositories.course_performance as course_repo
-import repositories.participation as part_repo
-import repositories.integrity as integrity_repo
-import repositories.item_analysis as item_repo
-import repositories.performance as perf_repo
-import repositories.student as student_repo
-import repositories.ai_insights as ai_repo
+from schemas.auth import UserContext
+from schemas.filters import AnalyticsFilters
+from services import ai_cache
+from services.ai_context import load_ai_context
+from services.predictions import get_standing_or_forecast
 
 
-def _tone_for(value: float, benchmark: float) -> str:
-    if value >= benchmark:
-        return "mint"
-    if value <= benchmark - 5:
-        return "rose"
-    return "amber"
+def _structured_recommendation(
+    rec_id: str,
+    kind: str,
+    metric: str,
+    value: Any,
+    threshold: Any,
+    text: str,
+    source: str,
+    evidence: list[dict],
+    action: Optional[dict],
+) -> dict:
+    return {
+        "id": rec_id,
+        "kind": kind,
+        "text": text,
+        "metric": metric,
+        "value": value,
+        "threshold": threshold,
+        "basedOn": {"source": source, "evidence": evidence},
+        "action": action,
+    }
 
 
-# ---------------------------------------------------------------------------
-# Insight
-# ---------------------------------------------------------------------------
-
-async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
-    role = ctx.role
-
+def _insight_from_context(role: str, data: dict[str, Any]) -> Optional[dict]:
     if role == "student":
-        # No LLM/topic-level data to generate a narrative from yet — the
-        # frontend already shows the real dashboard numbers directly.
         return None
 
     if role in ("senior_management", "program_director"):
-        overview = await mgmt_repo.get_management_overview(ctx, db)
-        colleges = overview["passRateByCollege"]
-        courses = overview["passRateByCourse"]
+        overview = data.get("overview") or {}
+        colleges = overview.get("passRateByCollege") or []
+        courses = overview.get("passRateByCourse") or []
         if not colleges:
             return {
                 "headline": "No exam data in this scope yet",
@@ -81,11 +84,11 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
         }
 
     if role == "academic_affairs":
-        participation = await part_repo.get_participation_report(ctx, db)
-        performance = await perf_repo.get_student_performance(ctx, db)
-        curricula = participation["attendanceByCurriculum"]
+        participation = data.get("participation") or {}
+        performance = data.get("performance") or {}
+        curricula = participation.get("attendanceByCurriculum") or []
         weakest_att = min(curricula, key=lambda c: c["attendance"]) if curricula else None
-        below_pass = [r for r in performance["ranked"] if r["status"] == "Fail"]
+        below_pass = [r for r in performance.get("ranked") or [] if r["status"] == "Fail"]
         if not weakest_att and not below_pass:
             return {
                 "headline": "No performance data in this scope yet",
@@ -94,9 +97,7 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
             }
         parts = []
         if below_pass:
-            parts.append(
-                f"{len(below_pass)} student(s) are currently below the {PASS_MARK}% pass mark"
-            )
+            parts.append(f"{len(below_pass)} student(s) are currently below the {PASS_MARK}% pass mark")
         if weakest_att:
             parts.append(
                 f"{weakest_att['course']} has the weakest attendance in the college at "
@@ -110,17 +111,21 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
         )
         warnings = []
         if below_pass:
-            warnings.append({
-                "id": "w1",
-                "text": f"{len(below_pass)} students below pass mark — follow up this week",
-                "tone": "rose",
-            })
+            warnings.append(
+                {
+                    "id": "w1",
+                    "text": f"{len(below_pass)} students below pass mark — follow up this week",
+                    "tone": "rose",
+                }
+            )
         if weakest_att:
-            warnings.append({
-                "id": "w2",
-                "text": f"{weakest_att['course']} attendance {weakest_att['attendance']}%",
-                "tone": "amber",
-            })
+            warnings.append(
+                {
+                    "id": "w2",
+                    "text": f"{weakest_att['course']} attendance {weakest_att['attendance']}%",
+                    "tone": "amber",
+                }
+            )
         return {
             "headline": headline,
             "body": body,
@@ -129,9 +134,9 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
         }
 
     if role == "professor":
-        sections = (await course_repo.get_course_performance(ctx, db))["sections"]
-        participation = await part_repo.get_participation_report(ctx, db)
-        items = await item_repo.get_item_analysis(ctx, db)
+        sections = (data.get("courses") or {}).get("sections") or []
+        participation = data.get("participation") or {}
+        items = data.get("items") or {}
         if not sections:
             return {
                 "headline": "No exam data in this scope yet",
@@ -151,7 +156,7 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
         else:
             body = f"{weakest_section['section']} averages {weakest_section['average']} across your curricula."
             headline = f"{weakest_section['section']} is your current baseline section"
-        needs_review = items["needsReview"]
+        needs_review = items.get("needsReview") or []
         if needs_review:
             top = needs_review[0]
             body += (
@@ -161,14 +166,16 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
         else:
             body += " No graded item-level answers are recorded yet, so item analysis has nothing to flag."
         warnings = []
-        curricula = participation["attendanceByCurriculum"]
+        curricula = participation.get("attendanceByCurriculum") or []
         weakest_att = min(curricula, key=lambda c: c["attendance"]) if curricula else None
         if weakest_att and weakest_att["attendance"] < 90:
-            warnings.append({
-                "id": "w1",
-                "text": f"{weakest_att['course']} attendance is {weakest_att['attendance']}%",
-                "tone": "amber",
-            })
+            warnings.append(
+                {
+                    "id": "w1",
+                    "text": f"{weakest_att['course']} attendance is {weakest_att['attendance']}%",
+                    "tone": "amber",
+                }
+            )
         return {
             "headline": headline,
             "body": body,
@@ -177,8 +184,8 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
         }
 
     if role == "it_academic_integrity":
-        report = await integrity_repo.get_integrity_report(ctx, db)
-        cases_raw = await ai_repo.top_flagged_attempts(db, limit=3)
+        report = data.get("integrity") or {}
+        cases_raw = data.get("flagged") or []
         if not cases_raw:
             return {
                 "headline": "No flagged attempts right now",
@@ -188,24 +195,26 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
         cases = []
         for i, c in enumerate(cases_raw):
             n = len(c["evidence"])
-            share = round(100 / n)
+            share = round(100 / n) if n else 0
             evidence = [{**e, "weight": share} for e in c["evidence"]]
             score = min(100, share * n)
             level = "High" if n >= 3 else "Medium" if n == 2 else "Low"
-            cases.append({
-                "id": f"case-{i + 1}",
-                "subject": c["student"],
-                "exam": c["exam"],
-                "level": level,
-                "score": score,
-                "evidence": evidence,
-            })
+            cases.append(
+                {
+                    "id": f"case-{i + 1}",
+                    "subject": c["student"],
+                    "exam": c["exam"],
+                    "level": level,
+                    "score": score,
+                    "evidence": evidence,
+                }
+            )
         top = cases_raw[0]
         top_flags = ", ".join(e["label"] for e in top["evidence"]).lower()
         return {
-            "headline": f"{report['flaggedCount']} of {report['totalAttempts']} monitored attempts flagged",
+            "headline": f"{report.get('flaggedCount', 0)} of {report.get('totalAttempts', 0)} monitored attempts flagged",
             "body": (
-                f"{report['flaggedCount']} attempts in this scope show at least one anomaly. "
+                f"{report.get('flaggedCount', 0)} attempts in this scope show at least one anomaly. "
                 f"The highest-signal case is {top['student']} on {top['exam']}, flagged for {top_flags}."
             ),
             "action": {"label": "Open case detail", "to": "/integrity"},
@@ -215,357 +224,352 @@ async def get_insight(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
     return None
 
 
-# ---------------------------------------------------------------------------
-# Prediction — no multi-term history exists yet, so this reports the real
-# CURRENT standing (ranked, weakest first) rather than a fabricated forecast.
-# ---------------------------------------------------------------------------
-
-async def get_prediction(ctx: UserContext, db: asyncpg.Connection) -> dict | None:
-    role = ctx.role
-    summary_note = (
-        "No multi-term history is recorded yet to project a trend, so this is the "
-        "real current-term standing, not a forecast."
-    )
-
-    if role == "student":
-        return None
-
-    if role in ("senior_management", "program_director"):
-        overview = await mgmt_repo.get_management_overview(ctx, db)
-        colleges = overview["passRateByCollege"]
-        if not colleges:
-            return None
-        overall = sum(c["passRate"] for c in colleges) / len(colleges)
-        ranked = sorted(colleges, key=lambda c: c["passRate"])[:3]
-        rows = [
-            {
-                "label": c["college"],
-                "value": f"{c['passRate']}% pass",
-                "tone": _tone_for(c["passRate"], overall),
-            }
-            for c in ranked
-        ]
-        return {
-            "title": "Current standing · colleges in scope",
-            "direction": "stable",
-            "summary": summary_note,
-            "rows": rows,
-            "action": {"label": "Open curriculum view", "to": "/courses"},
-        }
-
-    if role == "academic_affairs":
-        participation = await part_repo.get_participation_report(ctx, db)
-        curricula = participation["attendanceByCurriculum"]
-        if not curricula:
-            return None
-        overall = participation["attendanceRate"]
-        ranked = sorted(curricula, key=lambda c: c["attendance"])[:3]
-        rows = [
-            {
-                "label": c["course"],
-                "value": f"{c['attendance']}% attendance",
-                "tone": _tone_for(c["attendance"], overall),
-            }
-            for c in ranked
-        ]
-        return {
-            "title": "Current standing · attendance by curriculum",
-            "direction": "stable",
-            "summary": summary_note,
-            "rows": rows,
-            "action": {"label": "Open attendance", "to": "/participation"},
-        }
-
-    if role == "professor":
-        sections = (await course_repo.get_course_performance(ctx, db))["sections"]
-        if not sections:
-            return None
-        overall = sum(s["average"] for s in sections) / len(sections)
-        ranked = sorted(sections, key=lambda s: s["average"])[:3]
-        rows = [
-            {
-                "label": s["section"],
-                "value": f"{s['average']} avg · {s['passRate']}% pass",
-                "tone": _tone_for(s["average"], overall),
-            }
-            for s in ranked
-        ]
-        return {
-            "title": "Current standing · your sections",
-            "direction": "stable",
-            "summary": summary_note,
-            "rows": rows,
-            "action": {"label": "Open curriculum view", "to": "/courses"},
-        }
-
-    if role == "it_academic_integrity":
-        report = await integrity_repo.get_integrity_report(ctx, db)
-        summary_rows = report["summary"]
-        if not summary_rows:
-            return None
-        ranked = sorted(
-            summary_rows,
-            key=lambda s: (s["flagged"] / s["total"]) if s["total"] else 0,
-            reverse=True,
-        )[:3]
-        rows = [
-            {
-                "label": s["exam"],
-                "value": f"{s['flagged']}/{s['total']} flagged",
-                "tone": "rose" if s["total"] and s["flagged"] / s["total"] > 0.2 else "amber",
-            }
-            for s in ranked
-        ]
-        return {
-            "title": "Current standing · flagged share by exam",
-            "direction": "stable",
-            "summary": summary_note,
-            "rows": rows,
-            "action": {"label": "Open live monitoring", "to": "/real-time"},
-        }
-
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Recommendations — built from the same real numbers as the insight/
-# prediction above. `action` blocks are UI navigation wiring (route +
-# confirmation copy), not data claims, so they stay static per role like the
-# rest of the app's routing.
-# ---------------------------------------------------------------------------
-
-async def get_recommendations(
-    ctx: UserContext, db: asyncpg.Connection, insight_id: str
-) -> dict | None:
-    role = ctx.role
+def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: str) -> Optional[dict]:
     items: list[dict] = []
 
     if role == "student":
-        dashboard = await student_repo.get_student_dashboard(ctx, db)
-        timeline = dashboard["scoreTimeline"]
+        dashboard = data.get("dashboard") or {}
+        timeline = dashboard.get("scoreTimeline") or []
         if timeline:
             worst = min(timeline, key=lambda r: r["score"])
             delta = round(dashboard["average"] - dashboard["classAverage"], 1)
-            items.append({
-                "id": "s1",
-                "kind": "guidance" if delta >= 0 else "action",
-                "text": (
-                    f"Your average is {dashboard['average']}, "
-                    f"{'above' if delta >= 0 else 'below'} the class average of "
-                    f"{dashboard['classAverage']} by {abs(delta)} points"
-                ),
-                "basedOn": {
-                    "source": "Your real score history",
-                    "evidence": [
+            items.append(
+                _structured_recommendation(
+                    "s1",
+                    "guidance" if delta >= 0 else "action",
+                    "average_vs_class",
+                    dashboard["average"],
+                    dashboard["classAverage"],
+                    (
+                        f"Your average is {dashboard['average']}, "
+                        f"{'above' if delta >= 0 else 'below'} the class average of "
+                        f"{dashboard['classAverage']} by {abs(delta)} points"
+                    ),
+                    "Your real score history",
+                    [
                         {"label": "Your average", "detail": f"{dashboard['average']}"},
                         {"label": "Class average", "detail": f"{dashboard['classAverage']}"},
                     ],
-                },
-                "action": None,
-            })
-            items.append({
-                "id": "s2",
-                "kind": "guidance",
-                "text": f"Your weakest recorded exam is {worst['exam']} at {worst['score']}",
-                "basedOn": {
-                    "source": "Your real score timeline",
-                    "evidence": [
-                        {"label": worst["exam"], "detail": f"Score {worst['score']} vs class {worst['classAverage']}"},
-                    ],
-                },
-                "action": {
-                    "label": "Open my progress",
-                    "to": "/my-progress",
-                    "confirmTitle": "Open your progress page?",
-                    "confirmBody": "Opens your personal dashboard for this exam.",
-                    "confirmLabel": "Open",
-                },
-            })
+                    None,
+                )
+            )
+            items.append(
+                _structured_recommendation(
+                    "s2",
+                    "guidance",
+                    "weakest_exam",
+                    worst["score"],
+                    PASS_MARK,
+                    f"Your weakest recorded exam is {worst['exam']} at {worst['score']}",
+                    "Your real score timeline",
+                    [{"label": worst["exam"], "detail": f"Score {worst['score']} vs class {worst['classAverage']}"}],
+                    {
+                        "label": "Open my progress",
+                        "to": "/my-progress",
+                        "confirmTitle": "Open your progress page?",
+                        "confirmBody": "Opens your personal dashboard for this exam.",
+                        "confirmLabel": "Open",
+                    },
+                )
+            )
         return {"insightId": insight_id, "items": items} if items else None
 
     if role in ("senior_management", "program_director"):
-        overview = await mgmt_repo.get_management_overview(ctx, db)
-        colleges = overview["passRateByCollege"]
+        overview = data.get("overview") or {}
+        colleges = overview.get("passRateByCollege") or []
         if colleges:
             weakest = min(colleges, key=lambda c: c["passRate"])
-            items.append({
-                "id": "m1",
-                "kind": "action",
-                "text": f"{weakest['college']} pass rate is {weakest['passRate']}% — review curriculum calibration",
-                "basedOn": {
-                    "source": "Current pass rate by college",
-                    "evidence": [
-                        {"label": weakest["college"], "detail": f"{weakest['passRate']}% pass, {weakest['participants']} participants"},
+            items.append(
+                _structured_recommendation(
+                    "m1",
+                    "action",
+                    "college_pass_rate",
+                    weakest["passRate"],
+                    PASS_MARK,
+                    f"{weakest['college']} pass rate is {weakest['passRate']}% — review curriculum calibration",
+                    "Current pass rate by college",
+                    [
+                        {
+                            "label": weakest["college"],
+                            "detail": f"{weakest['passRate']}% pass, {weakest['participants']} participants",
+                        }
                     ],
-                },
-                "action": {
-                    "label": "Open curriculum drill-down",
-                    "to": "/courses",
-                    "confirmTitle": f"Open the {weakest['college']} drill-down?",
-                    "confirmBody": "Opens the curriculum performance view filtered to this college. Nothing is shared externally.",
-                    "confirmLabel": "Open drill-down",
-                },
-            })
+                    {
+                        "label": "Open curriculum drill-down",
+                        "to": "/courses",
+                        "confirmTitle": f"Open the {weakest['college']} drill-down?",
+                        "confirmBody": "Opens the curriculum performance view filtered to this college. Nothing is shared externally.",
+                        "confirmLabel": "Open drill-down",
+                    },
+                )
+            )
         if role == "senior_management":
-            integrity = await integrity_repo.get_integrity_report(ctx, db)
-            if integrity["totalAttempts"]:
-                items.append({
-                    "id": "m2",
-                    "kind": "action" if integrity["flaggedCount"] else "guidance",
-                    "text": f"{integrity['flaggedCount']} of {integrity['totalAttempts']} monitored attempts are flagged",
-                    "basedOn": {
-                        "source": "Current integrity monitoring",
-                        "evidence": [
-                            {"label": "Flagged", "detail": f"{integrity['flaggedCount']} of {integrity['totalAttempts']} attempts"},
+            integrity = data.get("integrity") or {}
+            if integrity.get("totalAttempts"):
+                items.append(
+                    _structured_recommendation(
+                        "m2",
+                        "action" if integrity["flaggedCount"] else "guidance",
+                        "flagged_attempts",
+                        integrity["flaggedCount"],
+                        0,
+                        f"{integrity['flaggedCount']} of {integrity['totalAttempts']} monitored attempts are flagged",
+                        "Current integrity monitoring",
+                        [
+                            {
+                                "label": "Flagged",
+                                "detail": f"{integrity['flaggedCount']} of {integrity['totalAttempts']} attempts",
+                            }
                         ],
-                    },
-                    "action": {
-                        "label": "Open case list",
-                        "to": "/integrity",
-                        "confirmTitle": "Open the case list?",
-                        "confirmBody": "Opens the monitoring log. No case status changes.",
-                        "confirmLabel": "Open case list",
-                    } if integrity["flaggedCount"] else None,
-                })
+                        {
+                            "label": "Open case list",
+                            "to": "/integrity",
+                            "confirmTitle": "Open the case list?",
+                            "confirmBody": "Opens the monitoring log. No case status changes.",
+                            "confirmLabel": "Open case list",
+                        }
+                        if integrity["flaggedCount"]
+                        else None,
+                    )
+                )
         else:
-            items_report = await item_repo.get_item_analysis(ctx, db)
-            if items_report["needsReview"]:
+            items_report = data.get("items") or {}
+            if items_report.get("needsReview"):
                 top = items_report["needsReview"][0]
-                items.append({
-                    "id": "p2",
-                    "kind": "action",
-                    "text": f"{top['exam']} question {top['number']} flagged — schedule an item review with faculty",
-                    "basedOn": {
-                        "source": "Current item analysis",
-                        "evidence": [
-                            {"label": f"Q{top['number']}", "detail": f"Discrimination {top['discriminationIndex']}"},
-                        ],
-                    },
-                    "action": {
-                        "label": "Open item analysis",
-                        "to": "/item-analysis",
-                        "confirmTitle": "Open item analysis?",
-                        "confirmBody": "Opens item analysis for flagged questions. No items are published or retired.",
-                        "confirmLabel": "Open",
-                    },
-                })
+                items.append(
+                    _structured_recommendation(
+                        "p2",
+                        "action",
+                        "discrimination_index",
+                        top["discriminationIndex"],
+                        0.2,
+                        f"{top['exam']} question {top['number']} flagged — schedule an item review with faculty",
+                        "Current item analysis",
+                        [{"label": f"Q{top['number']}", "detail": f"Discrimination {top['discriminationIndex']}"}],
+                        {
+                            "label": "Open item analysis",
+                            "to": "/item-analysis",
+                            "confirmTitle": "Open item analysis?",
+                            "confirmBody": "Opens item analysis for flagged questions. No items are published or retired.",
+                            "confirmLabel": "Open",
+                        },
+                    )
+                )
         return {"insightId": insight_id, "items": items} if items else None
 
     if role == "academic_affairs":
-        performance = await perf_repo.get_student_performance(ctx, db)
-        participation = await part_repo.get_participation_report(ctx, db)
-        below_pass = [r for r in performance["ranked"] if r["status"] == "Fail"]
+        performance = data.get("performance") or {}
+        participation = data.get("participation") or {}
+        below_pass = [r for r in performance.get("ranked") or [] if r["status"] == "Fail"]
         if below_pass:
-            items.append({
-                "id": "a1",
-                "kind": "action",
-                "text": f"Follow up with {len(below_pass)} student(s) below the pass mark",
-                "basedOn": {
-                    "source": "Current student performance",
-                    "evidence": [{"label": "Below pass", "detail": f"{len(below_pass)} students this term"}],
-                },
-                "action": {
-                    "label": "Open student performance",
-                    "to": "/performance",
-                    "confirmTitle": "Open student performance?",
-                    "confirmBody": "Opens the college performance view. No messages are sent to students.",
-                    "confirmLabel": "Open",
-                },
-            })
-        curricula = participation["attendanceByCurriculum"]
+            items.append(
+                _structured_recommendation(
+                    "a1",
+                    "action",
+                    "students_below_pass",
+                    len(below_pass),
+                    0,
+                    f"Follow up with {len(below_pass)} student(s) below the pass mark",
+                    "Current student performance",
+                    [{"label": "Below pass", "detail": f"{len(below_pass)} students this term"}],
+                    {
+                        "label": "Open student performance",
+                        "to": "/performance",
+                        "confirmTitle": "Open student performance?",
+                        "confirmBody": "Opens the college performance view. No messages are sent to students.",
+                        "confirmLabel": "Open",
+                    },
+                )
+            )
+        curricula = participation.get("attendanceByCurriculum") or []
         if curricula:
             weakest_att = min(curricula, key=lambda c: c["attendance"])
-            items.append({
-                "id": "a2",
-                "kind": "action",
-                "text": f"Review {weakest_att['course']} attendance ({weakest_att['attendance']}%)",
-                "basedOn": {
-                    "source": "Current attendance by curriculum",
-                    "evidence": [{"label": weakest_att["course"], "detail": f"{weakest_att['attendance']}% attendance"}],
-                },
-                "action": {
-                    "label": "Open attendance",
-                    "to": "/participation",
-                    "confirmTitle": "Open attendance?",
-                    "confirmBody": "Opens participation and attendance for every curriculum in the college.",
-                    "confirmLabel": "Open",
-                },
-            })
+            items.append(
+                _structured_recommendation(
+                    "a2",
+                    "action",
+                    "curriculum_attendance",
+                    weakest_att["attendance"],
+                    90,
+                    f"Review {weakest_att['course']} attendance ({weakest_att['attendance']}%)",
+                    "Current attendance by curriculum",
+                    [{"label": weakest_att["course"], "detail": f"{weakest_att['attendance']}% attendance"}],
+                    {
+                        "label": "Open attendance",
+                        "to": "/participation",
+                        "confirmTitle": "Open attendance?",
+                        "confirmBody": "Opens participation and attendance for every curriculum in the college.",
+                        "confirmLabel": "Open",
+                    },
+                )
+            )
         return {"insightId": insight_id, "items": items} if items else None
 
     if role == "professor":
-        sections = (await course_repo.get_course_performance(ctx, db))["sections"]
-        items_report = await item_repo.get_item_analysis(ctx, db)
+        sections = (data.get("courses") or {}).get("sections") or []
+        items_report = data.get("items") or {}
         if sections:
             weakest_section = min(sections, key=lambda s: s["average"])
-            items.append({
-                "id": "f1",
-                "kind": "action",
-                "text": f"{weakest_section['section']} averages {weakest_section['average']} — consider a review session",
-                "basedOn": {
-                    "source": "Current section performance",
-                    "evidence": [{"label": weakest_section["section"], "detail": f"{weakest_section['average']} avg, {weakest_section['passRate']}% pass"}],
-                },
-                "action": {
-                    "label": "Compare sections",
-                    "to": "/performance",
-                    "confirmTitle": "Open the section comparison?",
-                    "confirmBody": "This opens section performance for your curricula. No message is sent to students.",
-                    "confirmLabel": "Open comparison",
-                },
-            })
-        if items_report["needsReview"]:
+            items.append(
+                _structured_recommendation(
+                    "f1",
+                    "action",
+                    "section_average",
+                    weakest_section["average"],
+                    PASS_MARK,
+                    f"{weakest_section['section']} averages {weakest_section['average']} — consider a review session",
+                    "Current section performance",
+                    [
+                        {
+                            "label": weakest_section["section"],
+                            "detail": f"{weakest_section['average']} avg, {weakest_section['passRate']}% pass",
+                        }
+                    ],
+                    {
+                        "label": "Compare sections",
+                        "to": "/performance",
+                        "confirmTitle": "Open the section comparison?",
+                        "confirmBody": "This opens section performance for your curricula. No message is sent to students.",
+                        "confirmLabel": "Open comparison",
+                    },
+                )
+            )
+        if items_report.get("needsReview"):
             top = items_report["needsReview"][0]
-            items.append({
-                "id": "f2",
-                "kind": "action",
-                "text": f"Question {top['number']} on {top['exam']} flagged for review — low discrimination index",
-                "basedOn": {
-                    "source": "Current item analysis",
-                    "evidence": [{"label": f"Q{top['number']}", "detail": f"Discrimination {top['discriminationIndex']}"}],
-                },
-                "action": {
-                    "label": "Open in Item Analysis",
-                    "to": "/item-analysis",
-                    "confirmTitle": "Open the flagged question?",
-                    "confirmBody": "Item Analysis opens filtered to this question. Nothing is changed or published.",
-                    "confirmLabel": "Open question",
-                },
-            })
+            items.append(
+                _structured_recommendation(
+                    "f2",
+                    "action",
+                    "discrimination_index",
+                    top["discriminationIndex"],
+                    0.2,
+                    f"Question {top['number']} on {top['exam']} flagged for review — low discrimination index",
+                    "Current item analysis",
+                    [{"label": f"Q{top['number']}", "detail": f"Discrimination {top['discriminationIndex']}"}],
+                    {
+                        "label": "Open in Item Analysis",
+                        "to": "/item-analysis",
+                        "confirmTitle": "Open the flagged question?",
+                        "confirmBody": "Item Analysis opens filtered to this question. Nothing is changed or published.",
+                        "confirmLabel": "Open question",
+                    },
+                )
+            )
         return {"insightId": insight_id, "items": items} if items else None
 
     if role == "it_academic_integrity":
-        report = await integrity_repo.get_integrity_report(ctx, db)
-        cases_raw = await ai_repo.top_flagged_attempts(db, limit=1)
+        report = data.get("integrity") or {}
+        cases_raw = data.get("flagged") or []
         if cases_raw:
             top = cases_raw[0]
-            items.append({
-                "id": "i1",
-                "kind": "action",
-                "text": f"Recommended for review: {top['student']} / {top['exam']}",
-                "basedOn": {
-                    "source": f"Fused from {len(top['evidence'])} real signal(s)",
-                    "evidence": top["evidence"],
-                },
-                "action": {
-                    "label": "Create case",
-                    "to": "/integrity",
-                    "confirmTitle": "Create an investigation case?",
-                    "confirmBody": "Opens the case with the evidence above pre-attached and marked recommended for review. No finding is recorded and no one is notified.",
-                    "confirmLabel": "Create case",
-                },
-            })
-        if report["totalAttempts"]:
-            items.append({
-                "id": "i2",
-                "kind": "guidance",
-                "text": f"{report['flaggedCount']} of {report['totalAttempts']} monitored attempts are currently flagged",
-                "basedOn": {
-                    "source": "Current integrity monitoring",
-                    "evidence": [{"label": "Flagged", "detail": f"{report['flaggedCount']} of {report['totalAttempts']}"}],
-                },
-                "action": None,
-            })
+            items.append(
+                _structured_recommendation(
+                    "i1",
+                    "action",
+                    "integrity_signals",
+                    len(top["evidence"]),
+                    1,
+                    f"Recommended for review: {top['student']} / {top['exam']}",
+                    f"Fused from {len(top['evidence'])} real signal(s)",
+                    top["evidence"],
+                    {
+                        "label": "Create case",
+                        "to": "/integrity",
+                        "confirmTitle": "Create an investigation case?",
+                        "confirmBody": "Opens the case with the evidence above pre-attached and marked recommended for review. No finding is recorded and no one is notified.",
+                        "confirmLabel": "Create case",
+                    },
+                )
+            )
+        if report.get("totalAttempts"):
+            items.append(
+                _structured_recommendation(
+                    "i2",
+                    "guidance",
+                    "flagged_attempts",
+                    report["flaggedCount"],
+                    0,
+                    f"{report['flaggedCount']} of {report['totalAttempts']} monitored attempts are currently flagged",
+                    "Current integrity monitoring",
+                    [{"label": "Flagged", "detail": f"{report['flaggedCount']} of {report['totalAttempts']}"}],
+                    None,
+                )
+            )
         return {"insightId": insight_id, "items": items} if items else None
 
     return None
+
+
+def _unavailable(message: str, status: str = "unavailable") -> dict:
+    return {
+        "insight": None,
+        "prediction": None,
+        "recommendations": None,
+        "status": status,
+        "message": message,
+    }
+
+
+async def _compute_decision(
+    ctx: UserContext,
+    db: asyncpg.Connection,
+    filters: AnalyticsFilters,
+    insight_id: str,
+) -> dict:
+    data = await load_ai_context(ctx, db, filters)
+    insight = _insight_from_context(ctx.role, data)
+    prediction = await get_standing_or_forecast(ctx, db, filters, data)
+    recommendations = _recommendations_from_context(ctx.role, data, insight_id)
+    return {
+        "insight": insight,
+        "prediction": prediction,
+        "recommendations": recommendations,
+        "status": "ok",
+        "message": None,
+    }
+
+
+async def get_ai_decision(
+    ctx: UserContext,
+    db: asyncpg.Connection,
+    filters: AnalyticsFilters,
+    insight_id: str = "insight",
+) -> dict:
+    key = ai_cache.make_cache_key(ctx, filters)
+    cached = ai_cache.get(key)
+    if cached is not None:
+        return cached
+    try:
+        result = await asyncio.wait_for(
+            _compute_decision(ctx, db, filters, insight_id),
+            timeout=settings.AI_BUDGET_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        return _unavailable(
+            "AI analysis is taking longer than expected.",
+            status="timeout",
+        )
+    except Exception:
+        return _unavailable("AI analysis is temporarily unavailable.")
+    ai_cache.set(key, result)
+    return result
+
+
+async def get_insight(ctx: UserContext, db: asyncpg.Connection, filters: AnalyticsFilters | None = None):
+    decision = await get_ai_decision(ctx, db, filters or AnalyticsFilters())
+    return decision.get("insight")
+
+
+async def get_prediction(ctx: UserContext, db: asyncpg.Connection, filters: AnalyticsFilters | None = None):
+    decision = await get_ai_decision(ctx, db, filters or AnalyticsFilters())
+    return decision.get("prediction")
+
+
+async def get_recommendations(
+    ctx: UserContext,
+    db: asyncpg.Connection,
+    insight_id: str,
+    filters: AnalyticsFilters | None = None,
+):
+    decision = await get_ai_decision(ctx, db, filters or AnalyticsFilters(), insight_id)
+    return decision.get("recommendations")
