@@ -321,6 +321,193 @@ def test_failed_migration_rolls_back_and_is_not_recorded(tmp_path):
     assert present[0]["bad"] is None
 
 
+def test_migration_003_marks_owner_synthetic_ids_and_keeps_default_false():
+    _require_admin()
+    dbname = "bnu_analytics_ci_syn003"
+    _recreate(dbname)
+    url = _db_url(dbname)
+    setup = _psql(
+        url,
+        sql="""
+        CREATE TABLE exams (id text PRIMARY KEY);
+        CREATE TABLE questions (id text PRIMARY KEY, exam_id text);
+        CREATE TABLE exam_attempts (id text PRIMARY KEY, exam_id text);
+        CREATE TABLE attempt_answers (
+          attempt_id text NOT NULL,
+          question_id text NOT NULL,
+          PRIMARY KEY (attempt_id, question_id)
+        );
+        CREATE TABLE integrity_flags (id text PRIMARY KEY, attempt_id text);
+        CREATE TABLE transcript_entries (id text PRIMARY KEY);
+
+        INSERT INTO exams (id) VALUES
+          ('syn-exam-1'), ('e1'), ('ex-midterm'), ('imported-exam-99');
+        INSERT INTO questions (id, exam_id) VALUES
+          ('q-1', 'e1'),
+          ('child-of-syn', 'syn-exam-1'),
+          ('imported-q-1', 'imported-exam-99');
+        INSERT INTO exam_attempts (id, exam_id) VALUES
+          ('att-1', 'e1'),
+          ('child-att-syn', 'syn-exam-1'),
+          ('imported-att-1', 'imported-exam-99');
+        INSERT INTO attempt_answers (attempt_id, question_id) VALUES
+          ('att-1', 'q-1'),
+          ('imported-att-1', 'imported-q-1');
+        INSERT INTO integrity_flags (id, attempt_id) VALUES
+          ('flg-1', 'att-1'),
+          ('imported-flg-1', 'imported-att-1');
+        INSERT INTO transcript_entries (id) VALUES
+          ('tr-s1-c1'), ('syn-transc-1'), ('imported-transc-99');
+        """,
+    )
+    if setup.returncode != 0:
+        pytest.fail(setup.stderr)
+
+    migration = ROOT / "db" / "migrations" / "003_synthetic-data-markers.sql"
+    _apply_file(url, migration)
+    _apply_file(url, migration)
+
+    def flags(table: str) -> dict[str, bool]:
+        rows = asyncio.run(_fetch(url, f"SELECT id, is_synthetic FROM {table}"))
+        return {r["id"]: r["is_synthetic"] for r in rows}
+
+    assert flags("exams") == {
+        "syn-exam-1": True,
+        "e1": True,
+        "ex-midterm": True,
+        "imported-exam-99": False,
+    }
+    assert flags("questions") == {
+        "q-1": True,
+        "child-of-syn": True,
+        "imported-q-1": False,
+    }
+    assert flags("exam_attempts") == {
+        "att-1": True,
+        "child-att-syn": True,
+        "imported-att-1": False,
+    }
+    assert flags("integrity_flags") == {
+        "flg-1": True,
+        "imported-flg-1": False,
+    }
+    assert flags("transcript_entries") == {
+        "tr-s1-c1": True,
+        "syn-transc-1": True,
+        "imported-transc-99": False,
+    }
+    answer_rows = asyncio.run(
+        _fetch(
+            url,
+            "SELECT attempt_id, is_synthetic FROM attempt_answers ORDER BY attempt_id",
+        )
+    )
+    assert [(r["attempt_id"], r["is_synthetic"]) for r in answer_rows] == [
+        ("att-1", True),
+        ("imported-att-1", False),
+    ]
+
+    inserted = _psql(
+        url,
+        sql="INSERT INTO transcript_entries (id) VALUES ('future-unspecified');",
+    )
+    if inserted.returncode != 0:
+        pytest.fail(inserted.stderr)
+    future = asyncio.run(
+        _fetch(
+            url,
+            "SELECT is_synthetic FROM transcript_entries WHERE id = 'future-unspecified'",
+        )
+    )
+    assert future[0]["is_synthetic"] is False
+
+    default_row = asyncio.run(
+        _fetch(
+            url,
+            """
+            SELECT column_default, is_nullable
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'transcript_entries'
+              AND column_name = 'is_synthetic'
+            """,
+        )
+    )
+    assert default_row[0]["is_nullable"] == "NO"
+    assert "false" in default_row[0]["column_default"].lower()
+
+
+def test_migration_006_backfills_only_synthetic_attempts_after_003():
+    _require_admin()
+    dbname = "bnu_analytics_ci_syn006"
+    _recreate(dbname)
+    url = _db_url(dbname)
+    setup = _psql(
+        url,
+        sql="""
+        CREATE TABLE exams (id text PRIMARY KEY);
+        CREATE TABLE questions (
+          id text PRIMARY KEY,
+          exam_id text,
+          number smallint NOT NULL DEFAULT 1,
+          max_score numeric(6, 2) NOT NULL DEFAULT 1
+        );
+        CREATE TABLE exam_attempts (
+          id text PRIMARY KEY,
+          exam_id text,
+          student_id text NOT NULL DEFAULT 's1',
+          status text NOT NULL DEFAULT 'submitted'
+        );
+        CREATE TABLE attempt_answers (
+          attempt_id text NOT NULL,
+          question_id text NOT NULL,
+          is_correct boolean NOT NULL DEFAULT false,
+          points numeric(6, 2),
+          PRIMARY KEY (attempt_id, question_id)
+        );
+        CREATE TABLE integrity_flags (id text PRIMARY KEY, attempt_id text);
+        CREATE TABLE transcript_entries (id text PRIMARY KEY);
+
+        INSERT INTO exams (id) VALUES ('syn-exam-1'), ('imported-exam-99');
+        INSERT INTO questions (id, exam_id, number, max_score) VALUES
+          ('item-syn', 'syn-exam-1', 1, 5),
+          ('imported-q-1', 'imported-exam-99', 1, 5);
+        INSERT INTO exam_attempts (id, exam_id, student_id, status) VALUES
+          ('attempt-syn', 'syn-exam-1', 's1', 'submitted'),
+          ('attempt-absent', 'syn-exam-1', 's2', 'absent'),
+          ('imported-att-1', 'imported-exam-99', 's3', 'submitted');
+        INSERT INTO transcript_entries (id) VALUES ('syn-transc-1');
+        """,
+    )
+    if setup.returncode != 0:
+        pytest.fail(setup.stderr)
+
+    _apply_file(url, ROOT / "db" / "migrations" / "003_synthetic-data-markers.sql")
+    _apply_file(url, ROOT / "db" / "migrations" / "006_synthetic_item_answers.sql")
+    _apply_file(url, ROOT / "db" / "migrations" / "006_synthetic_item_answers.sql")
+
+    rows = asyncio.run(
+        _fetch(
+            url,
+            """
+            SELECT attempt_id, question_id, is_synthetic
+            FROM attempt_answers
+            ORDER BY attempt_id, question_id
+            """,
+        )
+    )
+    assert [(r["attempt_id"], r["question_id"], r["is_synthetic"]) for r in rows] == [
+        ("attempt-syn", "item-syn", True)
+    ]
+    marked = asyncio.run(
+        _fetch(
+            url,
+            "SELECT is_synthetic FROM transcript_entries WHERE id = 'syn-transc-1'",
+        )
+    )
+    assert marked[0]["is_synthetic"] is True
+
+
 def test_rls_student_cannot_see_other_students(fresh_db):
     rows = asyncio.run(_fetch_as_app(FRESH_DB, "u-student", "SELECT id FROM students"))
     assert [r["id"] for r in rows] == ["s7"]

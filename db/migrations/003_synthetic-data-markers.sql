@@ -17,6 +17,7 @@ alter table transcript_entries
 
 -- Demo seed uses stable text keys (e1, q-..., att-..., flg-..., tr-...).
 -- Production synthetic exams are owner-identified by id LIKE 'syn-exam%'.
+-- Production synthetic transcripts are owner-identified by id LIKE 'syn-transc%'.
 -- Related questions, attempts, answers and flags inherit that exam label.
 -- Do not infer synthetic status from other ID prefixes.
 -- Real imports should use SIS identifiers and remain is_synthetic = false.
@@ -31,6 +32,8 @@ update integrity_flags set is_synthetic = true
      or attempt_id in (select id from exam_attempts where is_synthetic);
 update transcript_entries set is_synthetic = true
   where id like 'tr-%';
+update transcript_entries set is_synthetic = true
+  where id like 'syn-transc%';
 update attempt_answers set is_synthetic = true
   where attempt_id in (select id from exam_attempts where is_synthetic);
 

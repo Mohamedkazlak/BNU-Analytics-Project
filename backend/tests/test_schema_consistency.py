@@ -38,10 +38,10 @@ def test_migration_files_do_not_own_transactions():
 def test_migration_003_marks_owner_syn_exam_and_propagates():
     migration = (ROOT / "db" / "migrations" / "003_synthetic-data-markers.sql").read_text()
     assert "id like 'syn-exam%'" in migration
+    assert "id like 'syn-transc%'" in migration
     assert "not null default false" in migration
     assert "exam_id in (select id from exams where is_synthetic)" in migration
     assert "attempt_id in (select id from exam_attempts where is_synthetic)" in migration
-    assert "syn-transc" not in migration
     assert "syn-q-" not in migration
     assert "syn-attemp" not in migration
     assert "syn-flag" not in migration
