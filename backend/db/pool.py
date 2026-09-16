@@ -32,7 +32,13 @@ def get_app_user_db_url(url: str) -> str:
 
 
 async def create_pool():
-    return await asyncpg.create_pool(get_app_user_db_url(settings.DATABASE_URL))
+    return await asyncpg.create_pool(
+        get_app_user_db_url(settings.DATABASE_URL),
+        min_size=1,
+        max_size=10,
+        command_timeout=20,
+        server_settings={"statement_timeout": "15000"},
+    )
 
 
 async def get_db_conn(request: Request):

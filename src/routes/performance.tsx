@@ -33,8 +33,9 @@ import {
   tooltipStyle,
 } from "@/components/dashboard-ui";
 import type { RankedStudent } from "@/lib/types";
+import { FiltersRequiredNotice } from "@/components/analytics-filters";
+import { useFilteredQuery } from "@/hooks/use-analytics-filters";
 import { roleGuard } from "@/lib/role-guards";
-import { useRole } from "@/components/role-context";
 import { ScopeBanner } from "@/components/scope-banner";
 
 export const Route = createFileRoute("/performance")({
@@ -44,25 +45,33 @@ export const Route = createFileRoute("/performance")({
       { title: "Student Performance Reports — BNU" },
       {
         name: "description",
-        content: "Average scores, pass/fail split, score distribution and ranked student results per exam.",
+        content:
+          "Average scores, pass/fail split, score distribution and ranked student results per exam.",
       },
       { property: "og:title", content: "Student Performance Reports — BNU" },
       {
         property: "og:description",
-        content: "Average scores, pass/fail split, score distribution and ranked student results per exam.",
+        content:
+          "Average scores, pass/fail split, score distribution and ranked student results per exam.",
       },
     ],
   }),
   component: PerformanceReport,
 });
 
-type SortKey = keyof Pick<RankedStudent, "rank" | "name" | "average" | "best" | "trend">;
+type SortKey = keyof Pick<
+  RankedStudent,
+  "rank" | "name" | "average" | "best" | "trend"
+>;
 
 function PerformanceReport() {
-  const { user, viewer } = useRole();
+  const { filters, filtersReady, queryKey, enabled } = useFilteredQuery(
+    "student-performance",
+  );
   const { data, isPending } = useQuery({
-    queryKey: ["student-performance", user.id],
-    queryFn: () => getStudentPerformance(viewer),
+    queryKey,
+    queryFn: () => getStudentPerformance(filters),
+    enabled,
   });
   const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [asc, setAsc] = useState(true);
@@ -70,11 +79,15 @@ function PerformanceReport() {
   const [status, setStatus] = useState("all");
   const [query, setQuery] = useState("");
 
+  if (!filtersReady) return <FiltersRequiredNotice />;
   if (isPending || !data) return <ScreenSkeleton cards={4} panels={3} />;
 
   const courseOptions = [
     { value: "all", label: "All curriculums" },
-    ...Array.from(new Set(data.ranked.map((r) => r.course))).map((c) => ({ value: c, label: c })),
+    ...Array.from(new Set(data.ranked.map((r) => r.course))).map((c) => ({
+      value: c,
+      label: c,
+    })),
   ];
 
   const visible = data.ranked.filter(
@@ -87,7 +100,10 @@ function PerformanceReport() {
   const sorted = [...visible].sort((a, b) => {
     const av = a[sortKey];
     const bv = b[sortKey];
-    const cmp = typeof av === "string" && typeof bv === "string" ? av.localeCompare(bv) : Number(av) - Number(bv);
+    const cmp =
+      typeof av === "string" && typeof bv === "string"
+        ? av.localeCompare(bv)
+        : Number(av) - Number(bv);
     return asc ? cmp : -cmp;
   });
 
@@ -108,9 +124,24 @@ function PerformanceReport() {
       <ScopeBanner />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatBlock label="Highest score" value={`${data.highest.score}`} sub={`${data.highest.name} · ${data.highest.exam}`} tone="mint" />
-        <StatBlock label="Lowest score" value={`${data.lowest.score}`} sub={`${data.lowest.name} · ${data.lowest.exam}`} tone="rose" />
-        <StatBlock label="Pass rate" value={`${passRate}%`} sub={`${passed} passed · ${failed} failed`} tone="iris" />
+        <StatBlock
+          label="Highest score"
+          value={`${data.highest.score}`}
+          sub={`${data.highest.name} · ${data.highest.exam}`}
+          tone="mint"
+        />
+        <StatBlock
+          label="Lowest score"
+          value={`${data.lowest.score}`}
+          sub={`${data.lowest.name} · ${data.lowest.exam}`}
+          tone="rose"
+        />
+        <StatBlock
+          label="Pass rate"
+          value={`${passRate}%`}
+          sub={`${passed} passed · ${failed} failed`}
+          tone="iris"
+        />
         <StatBlock
           label="Cohort average"
           value={`${(data.averageByExam.reduce((a, b) => a + b.average, 0) / data.averageByExam.length).toFixed(1)}`}
@@ -122,12 +153,33 @@ function PerformanceReport() {
         <Panel title="Average Score by Test" className="lg:col-span-2">
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.averageByExam} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+              <BarChart
+                data={data.averageByExam}
+                margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
+              >
                 <CartesianGrid stroke={chartColors.grid} vertical={false} />
-                <XAxis dataKey="exam" tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                <XAxis
+                  dataKey="exam"
+                  tick={{ fontSize: 10, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={[0, 100]}
+                />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Bar isAnimationActive={false} dataKey="average" name="Average" radius={[10, 10, 0, 0]} maxBarSize={46} fill={chartColors.iris} />
+                <Bar
+                  isAnimationActive={false}
+                  dataKey="average"
+                  name="Average"
+                  radius={[10, 10, 0, 0]}
+                  maxBarSize={46}
+                  fill={chartColors.iris}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -150,7 +202,9 @@ function PerformanceReport() {
                   <Cell fill={chartColors.rose} />
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 11, color: chartColors.axis }} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11, color: chartColors.axis }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -163,12 +217,30 @@ function PerformanceReport() {
         <Panel title="Score Distribution">
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.distribution} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+              <BarChart
+                data={data.distribution}
+                margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
+              >
                 <CartesianGrid stroke={chartColors.grid} vertical={false} />
-                <XAxis dataKey="bucket" tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} />
+                <XAxis
+                  dataKey="bucket"
+                  tick={{ fontSize: 10, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Bar isAnimationActive={false} dataKey="students" name="Students" radius={[8, 8, 0, 0]} fill={chartColors.violet} />
+                <Bar
+                  isAnimationActive={false}
+                  dataKey="students"
+                  name="Students"
+                  radius={[8, 8, 0, 0]}
+                  fill={chartColors.violet}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -177,13 +249,35 @@ function PerformanceReport() {
         <Panel title="Semester over Semester">
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.semesterComparison} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+              <LineChart
+                data={data.semesterComparison}
+                margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
+              >
                 <CartesianGrid stroke={chartColors.grid} vertical={false} />
-                <XAxis dataKey="exam" tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} domain={[40, 100]} />
+                <XAxis
+                  dataKey="exam"
+                  tick={{ fontSize: 10, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={[40, 100]}
+                />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 11, color: chartColors.axis }} />
-                <Line isAnimationActive={false} type="monotone" dataKey="current" name="This semester" stroke={chartColors.iris} strokeWidth={2.5} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11, color: chartColors.axis }}
+                />
+                <Line
+                  isAnimationActive={false}
+                  type="monotone"
+                  dataKey="current"
+                  name="This semester"
+                  stroke={chartColors.iris}
+                  strokeWidth={2.5}
+                />
                 <Line
                   type="monotone"
                   dataKey="previous"
@@ -202,8 +296,17 @@ function PerformanceReport() {
         title="Ranked Student Performance"
         action={
           <FilterBar>
-            <SearchInput value={query} onChange={setQuery} placeholder="Find a student…" />
-            <Select label="Curriculum" value={course} options={courseOptions} onChange={setCourse} />
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Find a student…"
+            />
+            <Select
+              label="Curriculum"
+              value={course}
+              options={courseOptions}
+              onChange={setCourse}
+            />
             <Select
               label="Result"
               value={status}
@@ -227,29 +330,46 @@ function PerformanceReport() {
               <Th onClick={() => toggle("name")}>Student</Th>
               <Th>Course</Th>
               <Th onClick={() => toggle("average")}>Avg score</Th>
-              <Th onClick={() => toggle("best")} align="right">Best</Th>
-              <Th onClick={() => toggle("trend")} align="right">Trend</Th>
+              <Th onClick={() => toggle("best")} align="right">
+                Best
+              </Th>
+              <Th onClick={() => toggle("trend")} align="right">
+                Trend
+              </Th>
               <Th align="right">Status</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-black/5">
             {sorted.map((row) => (
               <tr key={row.studentId} className="bg-white/40">
-                <td className="px-4 py-3 text-ink-soft">{String(row.rank).padStart(2, "0")}</td>
+                <td className="px-4 py-3 text-ink-soft">
+                  {String(row.rank).padStart(2, "0")}
+                </td>
                 <td className="px-4 py-3 font-semibold text-ink">{row.name}</td>
                 <td className="px-4 py-3 text-ink-soft">{row.course}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <Meter value={row.average} tone={row.status === "Pass" ? "iris" : "rose"} />
-                    <span className="font-semibold text-ink">{row.average}</span>
+                    <Meter
+                      value={row.average}
+                      tone={row.status === "Pass" ? "iris" : "rose"}
+                    />
+                    <span className="font-semibold text-ink">
+                      {row.average}
+                    </span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right text-ink-soft">{row.best}</td>
-                <td className={`px-4 py-3 text-right font-semibold ${row.trend >= 0 ? "text-mintink" : "text-rosee"}`}>
+                <td className="px-4 py-3 text-right text-ink-soft">
+                  {row.best}
+                </td>
+                <td
+                  className={`px-4 py-3 text-right font-semibold ${row.trend >= 0 ? "text-mintink" : "text-rosee"}`}
+                >
                   {row.trend >= 0 ? "▲" : "▼"} {Math.abs(row.trend)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Badge tone={row.status === "Pass" ? "pass" : "fail"}>{row.status}</Badge>
+                  <Badge tone={row.status === "Pass" ? "pass" : "fail"}>
+                    {row.status}
+                  </Badge>
                 </td>
               </tr>
             ))}

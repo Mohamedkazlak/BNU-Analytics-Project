@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
 from schemas.participation import ParticipationReport
 from schemas.auth import UserContext
-from core.dependencies import require_role
+from schemas.filters import AnalyticsFilters
+from core.dependencies import require_role, get_validated_filters
 from db.pool import get_db_conn
 import asyncpg
 from services.participation import get_participation_report
@@ -11,6 +12,7 @@ router = APIRouter(prefix="/api/participation-report", tags=["participation"])
 @router.get("", response_model=ParticipationReport)
 async def route_get_participation_report(
     ctx: UserContext = Depends(require_role("senior_management", "program_director", "academic_affairs", "professor")),
-    db: asyncpg.Connection = Depends(get_db_conn)
+    db: asyncpg.Connection = Depends(get_db_conn),
+    filters: AnalyticsFilters = Depends(get_validated_filters),
 ):
-    return await get_participation_report(ctx, db)
+    return await get_participation_report(ctx, db, filters)

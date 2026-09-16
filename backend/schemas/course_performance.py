@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Literal
 
 class AverageByCourse(BaseModel):
@@ -12,7 +12,15 @@ class SectionRow(BaseModel):
     average: float
     passRate: float
 
+class AssignedCourseRow(BaseModel):
+    id: str
+    code: str
+    name: str
+    enrolled: int
+    sections: List[str]
+
 class CoursePerformanceReport(BaseModel):
     averageByCourse: List[AverageByCourse]
     sections: List[SectionRow]
+    assignedCourses: List[AssignedCourseRow] = Field(default_factory=list)
     insight: str

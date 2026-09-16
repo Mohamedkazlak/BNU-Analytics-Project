@@ -30,6 +30,8 @@ import {
   chartColors,
   tooltipStyle,
 } from "@/components/dashboard-ui";
+import { FiltersRequiredNotice } from "@/components/analytics-filters";
+import { useFilteredQuery } from "@/hooks/use-analytics-filters";
 import { roleGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/students/$studentId")({
@@ -39,12 +41,14 @@ export const Route = createFileRoute("/students/$studentId")({
       { title: "Student Profile — BNU" },
       {
         name: "description",
-        content: "Full academic profile: yearly averages, GPA, course grades, attendance and exam history.",
+        content:
+          "Full academic profile: yearly averages, GPA, course grades, attendance and exam history.",
       },
       { property: "og:title", content: "Student Profile — BNU" },
       {
         property: "og:description",
-        content: "Full academic profile: yearly averages, GPA, course grades, attendance and exam history.",
+        content:
+          "Full academic profile: yearly averages, GPA, course grades, attendance and exam history.",
       },
       { property: "og:type", content: "profile" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -54,7 +58,11 @@ export const Route = createFileRoute("/students/$studentId")({
 });
 
 const standingTone = (standing: string) =>
-  standing === "Excellent" || standing === "Good standing" ? "pass" : standing === "Watch list" ? "warn" : "fail";
+  standing === "Excellent" || standing === "Good standing"
+    ? "pass"
+    : standing === "Watch list"
+      ? "warn"
+      : "fail";
 
 /**
  * PERMISSION GATE — evaluated before the profile is fetched. Named student
@@ -63,28 +71,32 @@ const standingTone = (standing: string) =>
  */
 function StudentProfile() {
   const { studentId } = Route.useParams();
-  const { role, user, viewer } = useRole();
+  const { role } = useRole();
   const allowed =
     role === "senior_management" ||
     role === "program_director" ||
     role === "academic_affairs" ||
     role === "professor";
+  const { filters, filtersReady, queryKey, enabled } =
+    useFilteredQuery("student-profile");
   const { data, isPending } = useQuery({
-    queryKey: ["student-profile", studentId, user.id],
-    queryFn: () => getStudentProfile(studentId, viewer),
-    enabled: allowed,
+    queryKey: [...queryKey, studentId],
+    queryFn: () => getStudentProfile(studentId, filters),
+    enabled: allowed && enabled,
   });
 
   if (!allowed) {
     return (
       <Panel title="Restricted">
         <p className="text-[13px] text-ink-soft">
-          Individual student records are available to Senior Management, Program Directors, Academic Affairs and Professors.
+          Individual student records are available to Senior Management, Program
+          Directors, Academic Affairs and Professors.
         </p>
       </Panel>
     );
   }
 
+  if (!filtersReady) return <FiltersRequiredNotice />;
   if (isPending || !data) return <ScreenSkeleton cards={4} panels={3} />;
 
   return (
@@ -101,13 +113,17 @@ function StudentProfile() {
             <div>
               <h1 className="font-display text-lg font-bold">{data.name}</h1>
               <p className="text-[12px] text-ink-soft">
-                {data.program} · Section {data.section} · Rank {data.cohortRank} of {data.cohortSize}
+                {data.program} · Section {data.section} · Rank {data.cohortRank}{" "}
+                of {data.cohortSize}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <Badge tone={standingTone(data.standing)}>{data.standing}</Badge>
-            <Link to="/students" className="text-[12px] font-semibold text-iris hover:underline">
+            <Link
+              to="/students"
+              className="text-[12px] font-semibold text-iris hover:underline"
+            >
               ← All students
             </Link>
           </div>
@@ -115,10 +131,29 @@ function StudentProfile() {
       </Panel>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatBlock label="All-years average" value={`${data.overallAverage}`} sub={`Cohort ${data.classAverage}`} tone="iris" />
-        <StatBlock label="Current GPA" value={`${data.gpa}`} sub="Latest academic year" tone="mint" />
-        <StatBlock label="Attendance" value={`${data.attendance}%`} sub="Latest academic year" />
-        <StatBlock label="Credits earned" value={`${data.totalCredits}`} sub={`${data.years.length} academic years`} tone="iris" />
+        <StatBlock
+          label="All-years average"
+          value={`${data.overallAverage}`}
+          sub={`Cohort ${data.classAverage}`}
+          tone="iris"
+        />
+        <StatBlock
+          label="Current GPA"
+          value={`${data.gpa}`}
+          sub="Cumulative GPA from transcript rules"
+          tone="mint"
+        />
+        <StatBlock
+          label="Attendance"
+          value={`${data.attendance}%`}
+          sub="Latest academic year"
+        />
+        <StatBlock
+          label="Credits earned"
+          value={`${data.totalCredits}`}
+          sub={`${data.years.length} academic years`}
+          tone="iris"
+        />
       </div>
 
       <div className="flex justify-end">
@@ -131,7 +166,8 @@ function StudentProfile() {
           }
           className="inline-flex items-center gap-1.5 rounded-full border border-ai/40 bg-white/70 px-3.5 py-1.5 text-[12px] font-semibold text-ai transition-colors hover:bg-ai/10"
         >
-          <Sparkles className="size-3.5" strokeWidth={2.4} /> Ask about this student
+          <Sparkles className="size-3.5" strokeWidth={2.4} /> Ask about this
+          student
         </button>
       </div>
 
@@ -139,14 +175,46 @@ function StudentProfile() {
         <Panel title="Average by Academic Year" className="lg:col-span-2">
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.yearTrend} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+              <LineChart
+                data={data.yearTrend}
+                margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
+              >
                 <CartesianGrid stroke={chartColors.grid} vertical={false} />
-                <XAxis dataKey="year" tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} domain={[30, 100]} />
+                <XAxis
+                  dataKey="year"
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={[30, 100]}
+                />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 11, color: chartColors.axis }} />
-                <Line isAnimationActive={false} type="monotone" dataKey="student" name={data.name} stroke={chartColors.iris} strokeWidth={2.5} dot={{ r: 3 }} />
-                <Line isAnimationActive={false} type="monotone" dataKey="cohort" name="Cohort average" stroke={chartColors.cyan} strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11, color: chartColors.axis }}
+                />
+                <Line
+                  isAnimationActive={false}
+                  type="monotone"
+                  dataKey="student"
+                  name={data.name}
+                  stroke={chartColors.iris}
+                  strokeWidth={2.5}
+                  dot={{ r: 3 }}
+                />
+                <Line
+                  isAnimationActive={false}
+                  type="monotone"
+                  dataKey="cohort"
+                  name="Cohort average"
+                  stroke={chartColors.cyan}
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  dot={false}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -157,8 +225,17 @@ function StudentProfile() {
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={data.topics} outerRadius="72%">
                 <PolarGrid stroke={chartColors.grid} />
-                <PolarAngleAxis dataKey="topic" tick={{ fontSize: 10, fill: chartColors.axis }} />
-                <Radar isAnimationActive={false} dataKey="score" stroke={chartColors.violet} fill={chartColors.violet} fillOpacity={0.28} />
+                <PolarAngleAxis
+                  dataKey="topic"
+                  tick={{ fontSize: 10, fill: chartColors.axis }}
+                />
+                <Radar
+                  isAnimationActive={false}
+                  dataKey="score"
+                  stroke={chartColors.violet}
+                  fill={chartColors.violet}
+                  fillOpacity={0.28}
+                />
                 <Tooltip contentStyle={tooltipStyle} />
               </RadarChart>
             </ResponsiveContainer>
@@ -183,10 +260,15 @@ function StudentProfile() {
           </thead>
           <tbody>
             {data.years.map((y) => (
-              <tr key={y.year} className="border-b border-black/5 last:border-0">
+              <tr
+                key={y.year}
+                className="border-b border-black/5 last:border-0"
+              >
                 <td className="px-4 py-2.5 font-semibold">{y.year}</td>
                 <td className="px-4 py-2.5 text-ink-soft">{y.yearLabel}</td>
-                <td className="px-4 py-2.5 text-right font-semibold">{y.average}</td>
+                <td className="px-4 py-2.5 text-right font-semibold">
+                  {y.average}
+                </td>
                 <td className="px-4 py-2.5 text-right">{y.gpa}</td>
                 <td className="px-4 py-2.5 text-right">{y.examsTaken}</td>
                 <td className="px-4 py-2.5 text-right">{y.passRate}%</td>
@@ -207,7 +289,9 @@ function StudentProfile() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data.courseMatrix.map((row) => {
-                  const entry: Record<string, string | number> = { course: row.course };
+                  const entry: Record<string, string | number> = {
+                    course: row.course,
+                  };
                   data.years.forEach((y, i) => {
                     entry[y.year] = row.values[i] ?? 0;
                   });
@@ -216,10 +300,22 @@ function StudentProfile() {
                 margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
               >
                 <CartesianGrid stroke={chartColors.grid} vertical={false} />
-                <XAxis dataKey="course" tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                <XAxis
+                  dataKey="course"
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={[0, 100]}
+                />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 11, color: chartColors.axis }} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11, color: chartColors.axis }}
+                />
                 {data.years.map((y, i) => (
                   <Bar
                     key={y.year}
@@ -227,7 +323,11 @@ function StudentProfile() {
                     dataKey={y.year}
                     radius={[8, 8, 0, 0]}
                     maxBarSize={26}
-                    fill={[chartColors.iris, chartColors.violet, chartColors.cyan][i % 3]}
+                    fill={
+                      [chartColors.iris, chartColors.violet, chartColors.cyan][
+                        i % 3
+                      ]
+                    }
                   />
                 ))}
               </BarChart>
@@ -249,14 +349,29 @@ function StudentProfile() {
             </thead>
             <tbody>
               {data.recentAttempts.map((a) => (
-                <tr key={`${a.course}-${a.exam}`} className="border-b border-black/5 last:border-0">
+                <tr
+                  key={`${a.course}-${a.exam}`}
+                  className="border-b border-black/5 last:border-0"
+                >
                   <td className="px-4 py-2.5 font-medium">{a.exam}</td>
                   <td className="px-4 py-2.5 text-ink-soft">{a.course}</td>
                   <td className="px-4 py-2.5 text-ink-soft">{a.date}</td>
-                  <td className="px-4 py-2.5 text-right font-semibold">{a.status === "No attempt" ? "—" : a.score}</td>
-                  <td className="px-4 py-2.5 text-right">{a.status === "No attempt" ? "—" : a.minutes}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold">
+                    {a.status === "No attempt" ? "—" : a.score}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    {a.status === "No attempt" ? "—" : a.minutes}
+                  </td>
                   <td className="px-4 py-2.5">
-                    <Badge tone={a.status === "Pass" ? "pass" : a.status === "Fail" ? "fail" : "neutral"}>
+                    <Badge
+                      tone={
+                        a.status === "Pass"
+                          ? "pass"
+                          : a.status === "Fail"
+                            ? "fail"
+                            : "neutral"
+                      }
+                    >
                       {a.status}
                     </Badge>
                   </td>

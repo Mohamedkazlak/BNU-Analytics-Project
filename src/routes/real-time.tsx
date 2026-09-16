@@ -19,6 +19,8 @@ import {
   SearchInput,
 } from "@/components/dashboard-ui";
 import type { StrugglingStudent } from "@/lib/types";
+import { FiltersRequiredNotice } from "@/components/analytics-filters";
+import { useFilteredQuery } from "@/hooks/use-analytics-filters";
 import { roleGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/real-time")({
@@ -28,26 +30,34 @@ export const Route = createFileRoute("/real-time")({
       { title: "Live Exam Monitoring — BNU" },
       {
         name: "description",
-        content: "Live view of in-progress exams and students currently in session.",
+        content:
+          "Live view of in-progress exams and students currently in session.",
       },
       { property: "og:title", content: "Live Exam Monitoring — BNU" },
       {
         property: "og:description",
-        content: "Live view of in-progress exams and students currently in session.",
+        content:
+          "Live view of in-progress exams and students currently in session.",
       },
     ],
   }),
   component: RealTime,
 });
 
-type SortKey = keyof Pick<StrugglingStudent, "name" | "lastScore" | "average" | "trend">;
+type SortKey = keyof Pick<
+  StrugglingStudent,
+  "name" | "lastScore" | "average" | "trend"
+>;
 
 function RealTime() {
-  const { user, viewer, role } = useRole();
+  const { role } = useRole();
   const isIntegrity = role === "it_academic_integrity";
+  const { filters, filtersReady, queryKey, enabled } =
+    useFilteredQuery("real-time");
   const { data, isPending, dataUpdatedAt } = useQuery({
-    queryKey: ["real-time", user.id],
-    queryFn: () => getRealTimeStruggling(viewer),
+    queryKey,
+    queryFn: () => getRealTimeStruggling(filters),
+    enabled,
     refetchInterval: 15000,
   });
   const [sortKey, setSortKey] = useState<SortKey>("lastScore");
@@ -70,6 +80,7 @@ function RealTime() {
     return () => clearInterval(id);
   }, [dataUpdatedAt]);
 
+  if (!filtersReady) return <FiltersRequiredNotice />;
   if (isPending || !data) return <ScreenSkeleton cards={3} panels={2} />;
 
   const courseOptions = [
@@ -120,7 +131,9 @@ function RealTime() {
         <StatBlock
           label={isIntegrity ? "Flagged in session" : "Struggling"}
           value={`${isIntegrity ? flaggedLive : data.students.length}`}
-          sub={isIntegrity ? "Live anomalies" : "Recent score below cohort mean"}
+          sub={
+            isIntegrity ? "Live anomalies" : "Recent score below cohort mean"
+          }
           tone="rose"
         />
         <StatBlock
@@ -134,10 +147,15 @@ function RealTime() {
       {isIntegrity && <AiDecisionSection role="it_academic_integrity" />}
 
       <Panel
-        title={isIntegrity ? "Live exams · university-wide" : "Live sittings · my curricula"}
+        title={
+          isIntegrity
+            ? "Live exams · university-wide"
+            : "Live sittings · my curricula"
+        }
         action={
           <span className="flex items-center gap-2 text-[11px] font-medium text-ink-soft">
-            <span className="size-1.5 animate-pulse rounded-full bg-mint" /> Live · {clock}
+            <span className="size-1.5 animate-pulse rounded-full bg-mint" />{" "}
+            Live · {clock}
           </span>
         }
       >
@@ -159,13 +177,19 @@ function RealTime() {
                 key={exam.examId}
                 className={exam.flagged > 0 ? "bg-rose/5" : "bg-white/40"}
               >
-                <td className="px-4 py-3 font-semibold text-ink">{exam.exam}</td>
+                <td className="px-4 py-3 font-semibold text-ink">
+                  {exam.exam}
+                </td>
                 <td className="px-4 py-3 text-ink-soft">{exam.program}</td>
                 <td className="px-4 py-3 text-right font-semibold text-ink">
                   {exam.activeNow}
                 </td>
-                <td className="px-4 py-3 text-right text-ink-soft">{exam.submitted}</td>
-                <td className="px-4 py-3 text-right text-ink-soft">{exam.expected}</td>
+                <td className="px-4 py-3 text-right text-ink-soft">
+                  {exam.submitted}
+                </td>
+                <td className="px-4 py-3 text-right text-ink-soft">
+                  {exam.expected}
+                </td>
                 <td className="px-4 py-3 text-right">
                   {exam.flagged > 0 ? (
                     <Badge tone="fail">{exam.flagged}</Badge>
@@ -189,8 +213,17 @@ function RealTime() {
           title="Students currently struggling"
           action={
             <FilterBar>
-              <SearchInput value={query} onChange={setQuery} placeholder="Find a student…" />
-              <Select label="Curriculum" value={course} options={courseOptions} onChange={setCourse} />
+              <SearchInput
+                value={query}
+                onChange={setQuery}
+                placeholder="Find a student…"
+              />
+              <Select
+                label="Curriculum"
+                value={course}
+                options={courseOptions}
+                onChange={setCourse}
+              />
             </FilterBar>
           }
         >
@@ -215,7 +248,9 @@ function RealTime() {
                   key={row.studentId}
                   className={row.lastScore < 60 ? "bg-rose/5" : "bg-white/40"}
                 >
-                  <td className="px-4 py-3 font-semibold text-ink">{row.name}</td>
+                  <td className="px-4 py-3 font-semibold text-ink">
+                    {row.name}
+                  </td>
                   <td className="px-4 py-3 text-ink-soft">{row.course}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -223,10 +258,14 @@ function RealTime() {
                         value={row.lastScore}
                         tone={row.lastScore < 60 ? "rose" : "amber"}
                       />
-                      <span className="font-semibold text-ink">{row.lastScore}</span>
+                      <span className="font-semibold text-ink">
+                        {row.lastScore}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right text-ink-soft">{row.average}</td>
+                  <td className="px-4 py-3 text-right text-ink-soft">
+                    {row.average}
+                  </td>
                   <td
                     className={`px-4 py-3 text-right font-semibold ${row.trend >= 0 ? "text-mintink" : "text-rosee"}`}
                   >

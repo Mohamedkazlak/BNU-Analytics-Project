@@ -1,5 +1,6 @@
 import { AiDecisionSection } from "@/components/ai-insights";
 import { ScopeBanner } from "@/components/scope-banner";
+import { FiltersRequiredNotice } from "@/components/analytics-filters";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -28,10 +29,15 @@ import {
   chartColors,
   tooltipStyle,
 } from "@/components/dashboard-ui";
-import { useRole } from "@/components/role-context";
+import { useFilteredQuery } from "@/hooks/use-analytics-filters";
 import type { Role } from "@/lib/types";
 
-const palette = [chartColors.iris, chartColors.cyan, chartColors.mint, chartColors.amber];
+const palette = [
+  chartColors.iris,
+  chartColors.cyan,
+  chartColors.mint,
+  chartColors.amber,
+];
 
 /** Shared KPI / chart overview used by senior_management and program_director shells. */
 export function OverviewDashboard({
@@ -41,25 +47,21 @@ export function OverviewDashboard({
   role: Role;
   scopeLabel?: string;
 }) {
-  const { user, viewer } = useRole();
+  const { filters, filtersReady, queryKey, enabled } = useFilteredQuery(
+    "management-overview",
+  );
   const { data, isPending } = useQuery({
-    queryKey: ["management-overview", user.id],
-    queryFn: () => getManagementOverview(viewer),
+    queryKey,
+    queryFn: () => getManagementOverview(filters),
+    enabled,
   });
-  const [curriculum, setCurriculum] = useState("all");
   const [sort, setSort] = useState("passRate");
 
+  if (!filtersReady) return <FiltersRequiredNotice />;
   if (isPending || !data) return <ScreenSkeleton cards={4} panels={2} />;
 
   const showColleges = data.passRateByCollege.length > 1;
-  const courseOptions = [
-    { value: "all", label: showColleges ? "All curricula in view" : "All college curricula" },
-    ...data.passRateByCourse.map((row) => ({ value: row.course, label: row.course })),
-  ];
-
-  const filtered = data.passRateByCourse.filter(
-    (row) => curriculum === "all" || row.course === curriculum,
-  );
+  const filtered = data.passRateByCourse;
   const ordered = [...filtered].sort((a, b) =>
     sort === "course"
       ? a.course.localeCompare(b.course)
@@ -67,19 +69,20 @@ export function OverviewDashboard({
         ? b.participants - a.participants
         : b.passRate - a.passRate,
   );
-  const colleges = [...data.passRateByCollege].sort((a, b) => b.passRate - a.passRate);
+  const colleges = [...data.passRateByCollege].sort(
+    (a, b) => b.passRate - a.passRate,
+  );
 
   return (
     <>
       <ScopeBanner />
-      {scopeLabel && scopeLabel !== viewer.label ? (
+      {scopeLabel ? (
         <div className="rounded-2xl border border-iris/20 bg-iris/8 px-4 py-2.5 text-[12px] font-medium text-iris">
           Scope · {scopeLabel}
         </div>
       ) : null}
 
       <FilterBar>
-        <Select label="Curriculum" value={curriculum} options={courseOptions} onChange={setCurriculum} />
         <Select
           label="Sort by"
           value={sort}
@@ -114,13 +117,24 @@ export function OverviewDashboard({
             <tbody className="divide-y divide-black/5">
               {colleges.map((row, i) => (
                 <tr key={row.college} className="bg-white/40">
-                  <td className="px-4 py-3 font-semibold text-ink">{row.college}</td>
+                  <td className="px-4 py-3 font-semibold text-ink">
+                    {row.college}
+                  </td>
                   <td className="px-4 py-3 text-ink-soft">{row.courses}</td>
-                  <td className="px-4 py-3 text-ink-soft">{row.participants.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-ink-soft">
+                    {row.participants.toLocaleString()}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <Meter value={row.passRate} tone={(["iris", "cyan", "mint", "amber"] as const)[i % 4]!} />
-                      <span className="font-semibold text-ink">{row.passRate}%</span>
+                      <Meter
+                        value={row.passRate}
+                        tone={
+                          (["iris", "cyan", "mint", "amber"] as const)[i % 4]!
+                        }
+                      />
+                      <span className="font-semibold text-ink">
+                        {row.passRate}%
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -142,9 +156,17 @@ export function OverviewDashboard({
         >
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ordered} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+              <BarChart
+                data={ordered}
+                margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
+              >
                 <CartesianGrid stroke={chartColors.grid} vertical={false} />
-                <XAxis dataKey="course" tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} />
+                <XAxis
+                  dataKey="course"
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <YAxis
                   tick={{ fontSize: 11, fill: chartColors.axis }}
                   axisLine={false}
@@ -152,8 +174,16 @@ export function OverviewDashboard({
                   domain={[0, 100]}
                   unit="%"
                 />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `${v}%`} />
-                <Bar isAnimationActive={false} dataKey="passRate" radius={[10, 10, 0, 0]} maxBarSize={54}>
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(v: number) => `${v}%`}
+                />
+                <Bar
+                  isAnimationActive={false}
+                  dataKey="passRate"
+                  radius={[10, 10, 0, 0]}
+                  maxBarSize={54}
+                >
                   {ordered.map((row, i) => (
                     <Cell key={row.course} fill={palette[i % palette.length]} />
                   ))}
@@ -166,16 +196,42 @@ export function OverviewDashboard({
         <Panel title="Exam activity · 6 mo">
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.activityTrend} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+              <AreaChart
+                data={data.activityTrend}
+                margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
+              >
                 <defs>
-                  <linearGradient id={`activity-${role}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={chartColors.iris} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={chartColors.violet} stopOpacity={0.02} />
+                  <linearGradient
+                    id={`activity-${role}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor={chartColors.iris}
+                      stopOpacity={0.35}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={chartColors.violet}
+                      stopOpacity={0.02}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke={chartColors.grid} vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: chartColors.axis }} axisLine={false} tickLine={false} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: chartColors.axis }}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Area
                   isAnimationActive={false}
@@ -196,7 +252,11 @@ export function OverviewDashboard({
 
       <Panel
         title="Participation by curriculum"
-        action={<span className="text-[11px] font-medium text-ink-soft">Current term</span>}
+        action={
+          <span className="text-[11px] font-medium text-ink-soft">
+            Current term
+          </span>
+        }
       >
         <TableShell>
           <thead className="bg-iris/8">
@@ -209,12 +269,23 @@ export function OverviewDashboard({
           <tbody className="divide-y divide-black/5">
             {ordered.map((row, i) => (
               <tr key={row.course} className="bg-white/40">
-                <td className="px-4 py-3 font-semibold text-ink">{row.course}</td>
-                <td className="px-4 py-3 text-ink-soft">{row.participants.toLocaleString()}</td>
+                <td className="px-4 py-3 font-semibold text-ink">
+                  {row.course}
+                </td>
+                <td className="px-4 py-3 text-ink-soft">
+                  {row.participants.toLocaleString()}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <Meter value={row.passRate} tone={(["iris", "cyan", "mint", "amber"] as const)[i % 4]!} />
-                    <span className="font-semibold text-ink">{row.passRate}%</span>
+                    <Meter
+                      value={row.passRate}
+                      tone={
+                        (["iris", "cyan", "mint", "amber"] as const)[i % 4]!
+                      }
+                    />
+                    <span className="font-semibold text-ink">
+                      {row.passRate}%
+                    </span>
                   </div>
                 </td>
               </tr>

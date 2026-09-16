@@ -23,19 +23,22 @@ class StudentDashboardReport(BaseModel):
 
 class CourseScore(BaseModel):
     course: str
-    code: str
+    code: Optional[str] = None
     credits: int
     average: float
     grade: str
 
 class YearReport(BaseModel):
     year: str
+    yearLabel: Optional[str] = None
     average: float
     gpa: float
     credits: int
     classAverage: float
     attendance: float
     standing: str
+    examsTaken: int = 0
+    passRate: float = 0
     courses: List[CourseScore]
 
 class YearTrend(BaseModel):

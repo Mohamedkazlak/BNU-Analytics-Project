@@ -1,23 +1,16 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { ChatPanel } from "./chat-panel";
-import {
-  demoUsers,
-  displayRoleLabel,
-  affiliationForScope,
-  navByRole,
-  roleHome,
-  useRole,
-} from "./role-context";
-import type { DemoUser } from "@/lib/types";
+import { navByRole, roleHome, useRole } from "./role-context";
+import type { UserAffiliation } from "@/lib/types";
 import { clearAuthToken } from "@/lib/auth-token";
 import { rolesAllowedForPath } from "@/lib/role-guards";
+import { AnalyticsFilters } from "@/components/analytics-filters";
 
 const BRAND_LOGO = "/brand-logo.png";
 
-function AffiliationParts({ user }: { user: DemoUser }) {
-  const affiliation = affiliationForScope(user.scopeId);
+function AffiliationParts({ affiliation }: { affiliation: UserAffiliation }) {
   if (!affiliation.sector && !affiliation.college) {
     return <span className="text-ink-soft">{affiliation.label}</span>;
   }
@@ -33,15 +26,12 @@ function AffiliationParts({ user }: { user: DemoUser }) {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { role, setUser, user, displayRole, affiliation } = useRole();
+  const { role, user, displayRole, affiliation } = useRole();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [open, setOpen] = useState(false);
   const groups = navByRole[role];
-  const ownerUser = demoUsers.find((u) =>
-    navByRole[u.role].some((g) => g.items.some((item) => item.to === pathname)),
-  );
-  const owner = ownerUser?.role;
+  const allowed = rolesAllowedForPath(pathname);
+  const owner = allowed?.includes(role) ? role : allowed?.[0];
   const current = (owner ? navByRole[owner] : groups)
     .flatMap((g) => g.items)
     .find((item) => item.to === pathname);
@@ -53,12 +43,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       void navigate({ to: roleHome[role] });
     }
   }, [navigate, pathname, role]);
-
-  const switchUser = (next: DemoUser) => {
-    setUser(next.id);
-    setOpen(false);
-    navigate({ to: roleHome[next.role] });
-  };
 
   return (
     <div className="min-h-screen w-full text-ink">
@@ -124,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {displayRole}
                 </div>
                 <div className="mt-0.5 truncate text-[10px] text-ink-soft">
-                  <AffiliationParts user={user} />
+                  <AffiliationParts affiliation={affiliation} />
                 </div>
               </div>
             </div>
@@ -198,7 +182,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          <div className="mt-6 space-y-4">{children}</div>
+          <div className="mt-6 space-y-4">
+            {role !== "student" ? <AnalyticsFilters /> : null}
+            {children}
+          </div>
 
           <nav className="mt-8 flex flex-wrap gap-2 md:hidden">
             {groups

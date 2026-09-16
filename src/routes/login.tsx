@@ -120,8 +120,8 @@ function Login() {
       // changes, so a client-side transition right after login would keep
       // showing the previous (default) role's nav until a manual reload.
       window.location.href = targetRoute;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }

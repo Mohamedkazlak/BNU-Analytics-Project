@@ -25,6 +25,11 @@ export const Route = createFileRoute("/management")({
 });
 
 function ManagementShell() {
-  const { viewer } = useRole();
-  return <OverviewDashboard role="senior_management" scopeLabel={viewer.label} />;
+  const { affiliation } = useRole();
+  return (
+    <OverviewDashboard
+      role="senior_management"
+      scopeLabel={affiliation.label}
+    />
+  );
 }

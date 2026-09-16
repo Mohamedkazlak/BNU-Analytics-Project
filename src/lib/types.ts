@@ -30,6 +30,31 @@ export interface DemoUser {
   scopeId: string | null;
   courseIds?: string[];
   studentId?: string;
+  courses?: {
+    id: string;
+    code: string;
+    name: string;
+    enrolled: number;
+    sections: string[];
+  }[];
+}
+
+export interface UserAffiliation {
+  university: string;
+  sector: string | null;
+  college: string | null;
+  label: string;
+}
+
+export interface ViewerScope {
+  userId: string;
+  role: Role;
+  scopeId: string | null;
+  programs: string[];
+  courseIds: string[];
+  courseCodes: string[];
+  label: string;
+  level: "university" | "sector" | "program" | "course" | "global";
 }
 
 export type UniversityOffice = "president" | "vp_aa";
@@ -224,6 +249,13 @@ export interface CoursePerformanceReport {
     course: string;
     average: number;
     passRate: number;
+  }[];
+  assignedCourses?: {
+    id: string;
+    code: string;
+    name: string;
+    enrolled: number;
+    sections: string[];
   }[];
   insight: string;
 }

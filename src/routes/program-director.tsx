@@ -25,8 +25,8 @@ export const Route = createFileRoute("/program-director")({
 });
 
 function ProgramDirectorShell() {
-  const { viewer } = useRole();
+  const { affiliation } = useRole();
   return (
-    <OverviewDashboard role="program_director" scopeLabel={viewer.label} />
+    <OverviewDashboard role="program_director" scopeLabel={affiliation.label} />
   );
 }
