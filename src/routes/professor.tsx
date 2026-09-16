@@ -2,11 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AiDecisionSection } from "@/components/ai-insights";
 import { ScopeBanner } from "@/components/scope-banner";
+import { FiltersRequiredNotice } from "@/components/analytics-filters";
 import { getStudentPerformance } from "@/lib/api";
-import { Badge, Meter, Panel, ScreenSkeleton, StatBlock, TableShell, Th } from "@/components/dashboard-ui";
+import {
+  Badge,
+  Meter,
+  Panel,
+  ScreenSkeleton,
+  StatBlock,
+  TableShell,
+  Th,
+} from "@/components/dashboard-ui";
 import { roleGuard } from "@/lib/role-guards";
 import { useRole } from "@/components/role-context";
-import { courses } from "@/lib/mock-data";
+import { useFilteredQuery } from "@/hooks/use-analytics-filters";
 
 export const Route = createFileRoute("/professor")({
   beforeLoad: roleGuard("/professor"),
@@ -15,12 +24,14 @@ export const Route = createFileRoute("/professor")({
       { title: "Professor Course Dashboard — BNU" },
       {
         name: "description",
-        content: "Course-scoped gradebook, attendance and AI insights for professors.",
+        content:
+          "Course-scoped gradebook, attendance and AI insights for professors.",
       },
       { property: "og:title", content: "Professor Course Dashboard — BNU" },
       {
         property: "og:description",
-        content: "Course-scoped gradebook, attendance and AI insights for professors.",
+        content:
+          "Course-scoped gradebook, attendance and AI insights for professors.",
       },
     ],
   }),
@@ -28,14 +39,18 @@ export const Route = createFileRoute("/professor")({
 });
 
 function ProfessorShell() {
-  const { user, viewer } = useRole();
-  const courseIds = user.courseIds ?? ["c1"];
-  const myCourses = courses.filter((c) => courseIds.includes(c.id));
+  const { user } = useRole();
+  const myCourses = user.courses ?? [];
+  const { filters, filtersReady, queryKey, enabled } = useFilteredQuery(
+    "student-performance",
+  );
   const performance = useQuery({
-    queryKey: ["performance", user.id],
-    queryFn: () => getStudentPerformance(viewer),
+    queryKey,
+    queryFn: () => getStudentPerformance(filters),
+    enabled,
   });
 
+  if (!filtersReady) return <FiltersRequiredNotice />;
   if (performance.isPending || !performance.data) {
     return <ScreenSkeleton cards={3} panels={2} />;
   }
@@ -82,18 +97,25 @@ function ProfessorShell() {
           </thead>
           <tbody className="divide-y divide-black/5">
             {rows.map((row) => (
-              <tr key={`${row.studentId}-${row.course}`} className="bg-white/40">
+              <tr
+                key={`${row.studentId}-${row.course}`}
+                className="bg-white/40"
+              >
                 <td className="px-4 py-3 text-ink-soft">{row.rank}</td>
                 <td className="px-4 py-3 font-semibold text-ink">{row.name}</td>
                 <td className="px-4 py-3 text-ink-soft">{row.course}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex items-center gap-2">
                     <Meter value={row.average} tone="iris" />
-                    <span className="font-semibold text-ink">{row.average}</span>
+                    <span className="font-semibold text-ink">
+                      {row.average}
+                    </span>
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Badge tone={row.status === "Pass" ? "pass" : "fail"}>{row.status}</Badge>
+                  <Badge tone={row.status === "Pass" ? "pass" : "fail"}>
+                    {row.status}
+                  </Badge>
                 </td>
               </tr>
             ))}
@@ -101,15 +123,23 @@ function ProfessorShell() {
         </TableShell>
       </Panel>
 
-      <Panel title="Attendance · my sections">
+      <Panel title="Assigned sections">
         <ul className="grid gap-2 sm:grid-cols-2">
           {myCourses.flatMap((c) =>
             c.sections.map((section) => (
-              <li key={`${c.id}-${section}`} className="rounded-2xl bg-white/60 px-3.5 py-3 text-[13px]">
+              <li
+                key={`${c.id}-${section}`}
+                className="rounded-2xl bg-white/60 px-3.5 py-3 text-[13px]"
+              >
                 <div className="font-semibold text-ink">
                   {c.code} · Section {section}
                 </div>
-                <div className="mt-1 text-ink-soft">Attendance 92% · {Math.round(c.enrolled / c.sections.length)} students</div>
+                <div className="mt-1 text-ink-soft">
+                  {c.sections.length
+                    ? Math.round(c.enrolled / c.sections.length)
+                    : c.enrolled}{" "}
+                  students enrolled
+                </div>
               </li>
             )),
           )}

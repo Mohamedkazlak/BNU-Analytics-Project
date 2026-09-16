@@ -17,8 +17,10 @@ import {
   TableShell,
   Th,
 } from "@/components/dashboard-ui";
-import { roleGuard } from "@/lib/role-guards";
+import { FiltersRequiredNotice } from "@/components/analytics-filters";
+import { useFilteredQuery } from "@/hooks/use-analytics-filters";
 import { ScopeBanner } from "@/components/scope-banner";
+import { roleGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/students/")({
   beforeLoad: roleGuard("/students"),
@@ -27,12 +29,14 @@ export const Route = createFileRoute("/students/")({
       { title: "Student Profiles — BNU" },
       {
         name: "description",
-        content: "Browse every student's academic record, yearly averages and standing across academic years.",
+        content:
+          "Browse every student's academic record, yearly averages and standing across academic years.",
       },
       { property: "og:title", content: "Student Profiles — BNU" },
       {
         property: "og:description",
-        content: "Browse every student's academic record, yearly averages and standing across academic years.",
+        content:
+          "Browse every student's academic record, yearly averages and standing across academic years.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -48,16 +52,18 @@ export const Route = createFileRoute("/students/")({
  * check runs inside the server function and in the row-level policy.
  */
 function StudentDirectory() {
-  const { role, user, viewer } = useRole();
+  const { role } = useRole();
   const allowed =
     role === "senior_management" ||
     role === "program_director" ||
     role === "academic_affairs" ||
     role === "professor";
+  const { filters, filtersReady, queryKey, enabled } =
+    useFilteredQuery("student-directory");
   const { data, isPending } = useQuery({
-    queryKey: ["student-directory", user.id],
-    queryFn: () => getStudentDirectory(viewer),
-    enabled: allowed,
+    queryKey,
+    queryFn: () => getStudentDirectory(filters),
+    enabled: allowed && enabled,
   });
   const [query, setQuery] = useState("");
   const [standing, setStanding] = useState("all");
@@ -66,12 +72,14 @@ function StudentDirectory() {
     return (
       <Panel title="Restricted">
         <p className="text-[13px] text-ink-soft">
-          Individual student records are available to Senior Management, Program Directors, Academic Affairs and Professors.
+          Individual student records are available to Senior Management, Program
+          Directors, Academic Affairs and Professors.
         </p>
       </Panel>
     );
   }
 
+  if (!filtersReady) return <FiltersRequiredNotice />;
   if (isPending || !data) return <ScreenSkeleton cards={4} panels={2} />;
 
   const standings = Array.from(new Set(data.map((r) => r.standing)));
@@ -82,7 +90,9 @@ function StudentDirectory() {
         r.program.toLowerCase().includes(query.trim().toLowerCase())),
   );
 
-  const atRisk = data.filter((r) => r.standing === "At risk" || r.standing === "Watch list").length;
+  const atRisk = data.filter(
+    (r) => r.standing === "At risk" || r.standing === "Watch list",
+  ).length;
   const improving = data.filter((r) => r.trend > 0).length;
 
   return (
@@ -92,18 +102,37 @@ function StudentDirectory() {
       <div className="flex justify-end">
         <button
           onClick={() =>
-            openChat({ context: "Ask about the directory", question: "Which students need attention right now?" })
+            openChat({
+              context: "Ask about the directory",
+              question: "Which students need attention right now?",
+            })
           }
           className="inline-flex items-center gap-1.5 rounded-full border border-ai/40 bg-white/70 px-3.5 py-1.5 text-[12px] font-semibold text-ai transition-colors hover:bg-ai/10"
         >
-          <Sparkles className="size-3.5" strokeWidth={2.4} /> Ask about the directory
+          <Sparkles className="size-3.5" strokeWidth={2.4} /> Ask about the
+          directory
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatBlock label="Students on record" value={`${data.length}`} sub="Full multi-year history" tone="iris" />
-        <StatBlock label="Improving" value={`${improving}`} sub="Higher than their first year" tone="mint" />
-        <StatBlock label="Needs attention" value={`${atRisk}`} sub="Watch list or at risk" tone="rose" />
+        <StatBlock
+          label="Students on record"
+          value={`${data.length}`}
+          sub="Full multi-year history"
+          tone="iris"
+        />
+        <StatBlock
+          label="Improving"
+          value={`${improving}`}
+          sub="Higher than their first year"
+          tone="mint"
+        />
+        <StatBlock
+          label="Needs attention"
+          value={`${atRisk}`}
+          sub="Watch list or at risk"
+          tone="rose"
+        />
         <StatBlock
           label="Cohort average"
           value={`${(data.reduce((a, b) => a + b.overallAverage, 0) / data.length).toFixed(1)}`}
@@ -119,9 +148,16 @@ function StudentDirectory() {
               label="Standing"
               value={standing}
               onChange={setStanding}
-              options={[{ value: "all", label: "All" }, ...standings.map((s) => ({ value: s, label: s }))]}
+              options={[
+                { value: "all", label: "All" },
+                ...standings.map((s) => ({ value: s, label: s })),
+              ]}
             />
-            <SearchInput value={query} onChange={setQuery} placeholder="Search students…" />
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Search students…"
+            />
           </FilterBar>
         }
       >
@@ -140,17 +176,25 @@ function StudentDirectory() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.studentId} className="border-b border-black/5 last:border-0 hover:bg-white/60">
+              <tr
+                key={r.studentId}
+                className="border-b border-black/5 last:border-0 hover:bg-white/60"
+              >
                 <td className="px-4 py-2.5 font-semibold">{r.name}</td>
                 <td className="px-4 py-2.5 text-ink-soft">{r.program}</td>
                 <td className="px-4 py-2.5 text-ink-soft">{r.section}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-2">
                     <span className="font-semibold">{r.overallAverage}</span>
-                    <Meter value={r.overallAverage} tone={r.overallAverage >= 70 ? "mint" : "amber"} />
+                    <Meter
+                      value={r.overallAverage}
+                      tone={r.overallAverage >= 70 ? "mint" : "amber"}
+                    />
                   </div>
                 </td>
-                <td className="px-4 py-2.5 text-right font-semibold">{r.latestYearAverage}</td>
+                <td className="px-4 py-2.5 text-right font-semibold">
+                  {r.latestYearAverage}
+                </td>
                 <td
                   className={`px-4 py-2.5 text-right font-semibold ${r.trend >= 0 ? "text-emerald-700" : "text-rose-600"}`}
                 >
@@ -160,7 +204,8 @@ function StudentDirectory() {
                 <td className="px-4 py-2.5">
                   <Badge
                     tone={
-                      r.standing === "Excellent" || r.standing === "Good standing"
+                      r.standing === "Excellent" ||
+                      r.standing === "Good standing"
                         ? "pass"
                         : r.standing === "Watch list"
                           ? "warn"

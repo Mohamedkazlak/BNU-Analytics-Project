@@ -1,16 +1,11 @@
-import { fetchFromBackend } from "./api";
-
-/**
- * Insights/predictions are now computed server-side (backend/services/ai_insights.py)
- * from the same real, RLS-scoped repository data the dashboards use — see the
- * fix plan's Phase 1. The role used to select a template is read from the
- * verified JWT on the backend, never from anything sent by this client.
- */
+import { fetchFromBackend, ApiError } from "./api";
+import type { AnalyticsFilters } from "./filter-types";
+import type { RecommendationSet } from "./ai-recommendations";
 
 export interface InsightEvidence {
   label: string;
   detail: string;
-  weight: number; // 0-100 contribution to the fused score
+  weight: number;
 }
 
 export interface RiskCase {
@@ -26,9 +21,7 @@ export interface Insight {
   headline: string;
   body: string;
   action: { label: string; to: string } | null;
-  /** Integrity: fused per-case risk instead of separate alerts. */
   cases?: RiskCase[];
-  /** Staff warnings strip — omitted for students. */
   warnings?: { id: string; text: string; tone: "amber" | "rose" }[];
 }
 
@@ -42,12 +35,43 @@ export interface Prediction {
     tone: "mint" | "amber" | "rose" | "iris";
   }[];
   action: { label: string; to: string } | null;
+  kind?: "current_standing" | "forecast";
 }
 
-export function getInsight(): Promise<Insight | null> {
-  return fetchFromBackend<Insight | null>("/api/insights");
+export interface AiDecision {
+  insight: Insight | null;
+  prediction: Prediction | null;
+  recommendations: RecommendationSet | null;
+  status: "ok" | "timeout" | "unavailable";
+  message?: string | null;
 }
 
-export function getPrediction(): Promise<Prediction | null> {
-  return fetchFromBackend<Prediction | null>("/api/predictions");
+export const AI_REQUEST_TIMEOUT_MS = 12000;
+
+export async function getAiDecision(
+  filters: AnalyticsFilters,
+): Promise<AiDecision> {
+  try {
+    return await fetchFromBackend<AiDecision>("/api/ai/decision", {
+      method: "POST",
+      body: {
+        sectorId: filters.sectorId ?? null,
+        collegeId: filters.collegeId ?? null,
+        curriculumId: filters.curriculumId ?? null,
+        studentId: filters.studentId ?? null,
+      },
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
+    });
+  } catch (error) {
+    const timedOut = error instanceof ApiError && error.status === 408;
+    return {
+      insight: null,
+      prediction: null,
+      recommendations: null,
+      status: timedOut ? "timeout" : "unavailable",
+      message: timedOut
+        ? "AI analysis is taking longer than expected."
+        : "AI analysis is temporarily unavailable.",
+    };
+  }
 }

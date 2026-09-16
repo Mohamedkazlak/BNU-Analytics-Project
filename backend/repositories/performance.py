@@ -1,109 +1,138 @@
 import asyncpg
+
+from core.utils import PASS_MARK, avg, round1
+from repositories.sql_filters import attempt_where
 from schemas.auth import UserContext
-from core.utils import avg, round1, PASS_MARK
+from schemas.filters import AnalyticsFilters
+
+EMPTY = {
+    "averageByExam": [],
+    "highest": {"name": "—", "score": 0, "exam": "—"},
+    "lowest": {"name": "—", "score": 0, "exam": "—"},
+    "passFail": [],
+    "distribution": [],
+    "ranked": [],
+    "semesterComparison": [],
+    "insight": "No attempts in this scope yet.",
+    "failCount": 0,
+}
 
 
-async def get_student_performance(ctx: UserContext, db: asyncpg.Connection):
-    rows = await db.fetch("""
-        SELECT student_id, name AS student_name, exam_id, exam_title, course_code,
-               score, scheduled_at
+async def get_student_performance(
+    ctx: UserContext,
+    db: asyncpg.Connection,
+    filters: AnalyticsFilters | None = None,
+):
+    filters = filters or AnalyticsFilters()
+    where_sql, args, _ = attempt_where(filters)
+    participated = f"{where_sql} AND a.participated AND a.score IS NOT NULL"
+
+    exam_rows = await db.fetch(
+        f"""
+        SELECT
+            a.exam_id,
+            split_part(a.exam_title, '—', 1) AS exam,
+            a.course_code AS course,
+            MIN(a.scheduled_at) AS scheduled_at,
+            AVG(a.score)::float AS average
+        FROM v_exam_attempts a
+        WHERE {participated}
+        GROUP BY a.exam_id, a.exam_title, a.course_code
+        ORDER BY MIN(a.scheduled_at)
+        """,
+        *args,
+    )
+    if not exam_rows:
+        return EMPTY
+
+    average_by_exam = [
+        {"exam": (r["exam"] or "").strip(), "course": r["course"], "average": round1(r["average"])}
+        for r in exam_rows
+    ]
+
+    extrema = await db.fetchrow(
+        f"""
+        SELECT
+            (ARRAY_AGG(s.name ORDER BY a.score DESC))[1] AS high_name,
+            MAX(a.score)::float AS high_score,
+            (ARRAY_AGG(a.course_code || ' · ' || split_part(a.exam_title, '—', 1) ORDER BY a.score DESC))[1] AS high_exam,
+            (ARRAY_AGG(s.name ORDER BY a.score ASC))[1] AS low_name,
+            MIN(a.score)::float AS low_score,
+            (ARRAY_AGG(a.course_code || ' · ' || split_part(a.exam_title, '—', 1) ORDER BY a.score ASC))[1] AS low_exam,
+            COUNT(*) FILTER (WHERE a.score >= {PASS_MARK}) AS passed,
+            COUNT(*) AS total
         FROM v_exam_attempts a
         JOIN v_students s ON s.id = a.student_id
-        WHERE a.participated
-    """)
-    if not rows:
-        return {
-            "averageByExam": [],
-            "highest": {"name": "—", "score": 0, "exam": "—"},
-            "lowest": {"name": "—", "score": 0, "exam": "—"},
-            "passFail": [],
-            "distribution": [],
-            "ranked": [],
-            "semesterComparison": [],
-            "insight": "No attempts in this scope yet.",
-        }
-
-    by_exam = {}
-    for r in rows:
-        by_exam.setdefault(
-            r["exam_id"],
-            {
-                "title": r["exam_title"],
-                "course": r["course_code"],
-                "scores": [],
-                "date": r["scheduled_at"],
-            },
-        )
-        by_exam[r["exam_id"]]["scores"].append(float(r["score"]))
-    average_by_exam = sorted(
-        [
-            {
-                "exam": v["title"].split("—")[0].strip(),
-                "course": v["course"],
-                "average": round1(avg(v["scores"])),
-                "date": v["date"],
-            }
-            for v in by_exam.values()
-        ],
-        key=lambda x: x["date"],
+        WHERE {participated}
+        """,
+        *args,
     )
 
-    top = max(rows, key=lambda r: r["score"])
-    bottom = min(rows, key=lambda r: r["score"])
-
-    passed = sum(1 for r in rows if r["score"] >= PASS_MARK)
-
+    dist_rows = await db.fetch(
+        f"""
+        SELECT bucket, COUNT(*)::int AS students
+        FROM (
+            SELECT CASE
+                WHEN a.score < 40 THEN '0–39'
+                WHEN a.score < 50 THEN '40–49'
+                WHEN a.score < 60 THEN '50–59'
+                WHEN a.score < 70 THEN '60–69'
+                WHEN a.score < 80 THEN '70–79'
+                WHEN a.score < 90 THEN '80–89'
+                ELSE '90–100'
+            END AS bucket
+            FROM v_exam_attempts a
+            WHERE {participated}
+        ) d
+        GROUP BY bucket
+        """,
+        *args,
+    )
     buckets = ["0–39", "40–49", "50–59", "60–69", "70–79", "80–89", "90–100"]
-    dist = [0] * 7
-    for r in rows:
-        s = float(r["score"])
-        idx = (
-            0
-            if s < 40
-            else (
-                1
-                if s < 50
-                else (
-                    2
-                    if s < 60
-                    else 3 if s < 70 else 4 if s < 80 else 5 if s < 90 else 6
-                )
-            )
-        )
-        dist[idx] += 1
-    distribution = [{"bucket": b, "students": c} for b, c in zip(buckets, dist)]
+    dist_map = {r["bucket"]: r["students"] for r in dist_rows}
+    distribution = [{"bucket": b, "students": dist_map.get(b, 0)} for b in buckets]
 
-    by_student = {}
-    for r in rows:
-        by_student.setdefault(
-            r["student_id"],
-            {"name": r["student_name"], "scores": [], "course": r["course_code"]},
-        )
-        by_student[r["student_id"]]["scores"].append(float(r["score"]))
-        by_student[r["student_id"]]["course"] = r["course_code"]
-    ranked_raw = []
-    for sid, v in by_student.items():
-        scores = v["scores"]
+    ranked_rows = await db.fetch(
+        f"""
+        SELECT
+            a.student_id,
+            s.name,
+            (ARRAY_AGG(a.course_code ORDER BY a.scheduled_at DESC))[1] AS course,
+            AVG(a.score)::float AS average,
+            MAX(a.score)::float AS best,
+            ARRAY_AGG(a.score ORDER BY a.scheduled_at) AS scores
+        FROM v_exam_attempts a
+        JOIN v_students s ON s.id = a.student_id
+        WHERE {participated}
+        GROUP BY a.student_id, s.name
+        ORDER BY AVG(a.score) DESC
+        """,
+        *args,
+    )
+    ranked = []
+    fail_count = 0
+    for i, r in enumerate(ranked_rows):
+        scores = [float(x) for x in (r["scores"] or [])]
         half = max(1, len(scores) // 2)
         trend = round(avg(scores[half:]) - avg(scores[:half])) if len(scores) > 1 else 0
-        avg_score = round1(avg(scores))
-        ranked_raw.append(
+        average = round1(r["average"])
+        status = "Pass" if average >= PASS_MARK else "Fail"
+        if status == "Fail":
+            fail_count += 1
+        ranked.append(
             {
-                "studentId": sid,
-                "name": v["name"],
-                "course": v["course"],
-                "average": avg_score,
-                "best": max(scores),
+                "rank": i + 1,
+                "studentId": r["student_id"],
+                "name": r["name"],
+                "course": r["course"],
+                "average": average,
+                "best": float(r["best"]),
                 "trend": trend,
-                "status": "Pass" if avg_score >= PASS_MARK else "Fail",
+                "status": status,
             }
         )
-    ranked_raw.sort(key=lambda x: -x["average"])
-    ranked = [{**r, "rank": i + 1} for i, r in enumerate(ranked_raw)]
 
-    # "previous" = this exam's cohort average one sitting earlier for the same course (real ordering by date),
-    # falls back to current when there is no earlier sitting.
-    by_course_series = {}
+    by_course_series: dict[str, list] = {}
     for v in average_by_exam:
         by_course_series.setdefault(v["course"], []).append(v)
     semester_comparison = []
@@ -114,33 +143,25 @@ async def get_student_performance(ctx: UserContext, db: asyncpg.Connection):
                 {"exam": v["exam"], "current": v["average"], "previous": previous}
             )
 
-    insight = (
-        "Scores are tracked across all attempts in this scope."
-        if len(rows)
-        else "No attempts in this scope yet."
-    )
-
     return {
-        "averageByExam": [
-            {"exam": v["exam"], "course": v["course"], "average": v["average"]}
-            for v in average_by_exam
-        ],
+        "averageByExam": average_by_exam,
         "highest": {
-            "name": top["student_name"],
-            "score": float(top["score"]),
-            "exam": f"{top['course_code']} · {top['exam_title'].split('—')[0].strip()}",
+            "name": extrema["high_name"],
+            "score": float(extrema["high_score"]),
+            "exam": (extrema["high_exam"] or "").strip(),
         },
         "lowest": {
-            "name": bottom["student_name"],
-            "score": float(bottom["score"]),
-            "exam": f"{bottom['course_code']} · {bottom['exam_title'].split('—')[0].strip()}",
+            "name": extrema["low_name"],
+            "score": float(extrema["low_score"]),
+            "exam": (extrema["low_exam"] or "").strip(),
         },
         "passFail": [
-            {"name": "Passed", "value": passed},
-            {"name": "Failed", "value": len(rows) - passed},
+            {"name": "Passed", "value": int(extrema["passed"] or 0)},
+            {"name": "Failed", "value": int((extrema["total"] or 0) - (extrema["passed"] or 0))},
         ],
         "distribution": distribution,
         "ranked": ranked,
         "semesterComparison": semester_comparison,
-        "insight": insight,
+        "insight": "Scores are tracked across all attempts in this scope.",
+        "failCount": fail_count,
     }

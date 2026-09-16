@@ -17,8 +17,9 @@ import {
   TableShell,
   Th,
 } from "@/components/dashboard-ui";
+import { FiltersRequiredNotice } from "@/components/analytics-filters";
+import { useFilteredQuery } from "@/hooks/use-analytics-filters";
 import { roleGuard } from "@/lib/role-guards";
-import { useRole } from "@/components/role-context";
 
 export const Route = createFileRoute("/academic-affairs")({
   beforeLoad: roleGuard("/academic-affairs"),
@@ -42,23 +43,33 @@ export const Route = createFileRoute("/academic-affairs")({
 });
 
 function AcademicAffairsShell() {
-  const { user, viewer } = useRole();
+  const performanceQ = useFilteredQuery("student-performance");
+  const participationQ = useFilteredQuery("participation");
+  const directoryQ = useFilteredQuery("student-directory");
+  const coursesQ = useFilteredQuery("course-performance");
+  const { filters, filtersReady } = performanceQ;
   const performance = useQuery({
-    queryKey: ["performance", user.id],
-    queryFn: () => getStudentPerformance(viewer),
+    queryKey: performanceQ.queryKey,
+    queryFn: () => getStudentPerformance(filters),
+    enabled: performanceQ.enabled,
   });
   const participation = useQuery({
-    queryKey: ["participation", user.id],
-    queryFn: () => getParticipationReport(viewer),
+    queryKey: participationQ.queryKey,
+    queryFn: () => getParticipationReport(filters),
+    enabled: participationQ.enabled,
   });
   const directory = useQuery({
-    queryKey: ["students", user.id],
-    queryFn: () => getStudentDirectory(viewer),
+    queryKey: directoryQ.queryKey,
+    queryFn: () => getStudentDirectory(filters),
+    enabled: directoryQ.enabled,
   });
   const courses = useQuery({
-    queryKey: ["courses", user.id],
-    queryFn: () => getCoursePerformance(viewer),
+    queryKey: coursesQ.queryKey,
+    queryFn: () => getCoursePerformance(filters),
+    enabled: coursesQ.enabled,
   });
+
+  if (!filtersReady) return <FiltersRequiredNotice />;
 
   if (
     performance.isPending ||
@@ -131,11 +142,15 @@ function AcademicAffairsShell() {
               );
               return (
                 <tr key={row.course} className="bg-white/40">
-                  <td className="px-4 py-3 font-semibold text-ink">{row.course}</td>
+                  <td className="px-4 py-3 font-semibold text-ink">
+                    {row.course}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Meter value={row.average} tone="iris" />
-                      <span className="font-semibold text-ink">{row.average}</span>
+                      <span className="font-semibold text-ink">
+                        {row.average}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-ink-soft">{row.quality}/10</td>
@@ -198,23 +213,25 @@ function AcademicAffairsShell() {
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5">
-              {(atRisk.length ? atRisk : directory.data.slice(-5)).map((row) => (
-                <tr key={row.studentId} className="bg-white/40">
-                  <td className="px-4 py-3 font-semibold text-ink">{row.name}</td>
-                  <td className="px-4 py-3">
-                    <Badge
-                      tone={
-                        row.standing === "Watch list" ? "warn" : "fail"
-                      }
-                    >
-                      {row.standing}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-ink">
-                    {row.overallAverage}
-                  </td>
-                </tr>
-              ))}
+              {(atRisk.length ? atRisk : directory.data.slice(-5)).map(
+                (row) => (
+                  <tr key={row.studentId} className="bg-white/40">
+                    <td className="px-4 py-3 font-semibold text-ink">
+                      {row.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge
+                        tone={row.standing === "Watch list" ? "warn" : "fail"}
+                      >
+                        {row.standing}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-ink">
+                      {row.overallAverage}
+                    </td>
+                  </tr>
+                ),
+              )}
             </tbody>
           </TableShell>
         </Panel>

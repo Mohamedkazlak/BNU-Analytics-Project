@@ -32,3 +32,4 @@ class ManagementOverview(BaseModel):
     passRateByCollege: List[PassRateByCollege]
     activityTrend: List[ActivityTrendRow]
     insight: str
+    containsSynthetic: bool = False

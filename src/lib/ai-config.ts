@@ -3,8 +3,8 @@ import type { Role } from "./types";
 /**
  * Feature toggles for the AI layer.
  *
- * Predictions / insights / warnings are ON for all staff roles.
- * Students only get performance UI + recommendations (no predictions).
+ * Current-standing rows are ON for staff roles. They are not forecasts.
+ * Students only get recommendations.
  */
 export const aiConfig: {
   showPredictions: Record<Role, boolean>;

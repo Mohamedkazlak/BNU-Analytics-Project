@@ -9,6 +9,8 @@ document retriever alongside these aggregate answers.
 import re
 import asyncpg
 from schemas.auth import UserContext
+from schemas.filters import AnalyticsFilters
+from repositories.accounts import validate_analytics_filters
 
 import repositories.management as mgmt_repo
 import repositories.course_performance as course_repo
@@ -130,11 +132,13 @@ def refusal_for(role: str, domain: DataDomain) -> str:
     return "That data is outside what your role is authorized to see, so I can't answer it."
 
 
-async def _answer(ctx: UserContext, db: asyncpg.Connection, domain: DataDomain) -> str:
+async def _answer(
+    ctx: UserContext, db: asyncpg.Connection, domain: DataDomain, filters: AnalyticsFilters
+) -> str:
     role = ctx.role
 
     if domain == "own_performance" and role == "student":
-        d = await student_repo.get_student_dashboard(ctx, db)
+        d = await student_repo.get_student_dashboard(ctx, db, filters)
         return (
             f"Your average is {d['average']}, versus a class average of {d['classAverage']}. "
             f"Your best topic is {d['bestTopic']}; your weakest is {d['weakestTopic']}."
@@ -142,12 +146,12 @@ async def _answer(ctx: UserContext, db: asyncpg.Connection, domain: DataDomain) 
 
     if domain == "anonymized_cohort":
         if role == "student":
-            d = await student_repo.get_student_dashboard(ctx, db)
+            d = await student_repo.get_student_dashboard(ctx, db, filters)
             return (
                 f"The class average across your exams is {d['classAverage']}; your average "
                 f"is {d['average']}. I can only show aggregates here, never individual classmates."
             )
-        perf = await perf_repo.get_student_performance(ctx, db)
+        perf = await perf_repo.get_student_performance(ctx, db, filters)
         if not perf["averageByExam"]:
             return "There are no recorded attempts in this scope yet."
         lo = min(perf["averageByExam"], key=lambda r: r["average"])
@@ -158,14 +162,14 @@ async def _answer(ctx: UserContext, db: asyncpg.Connection, domain: DataDomain) 
         )
 
     if domain in ("own_courses", "all_courses"):
-        cp = await course_repo.get_course_performance(ctx, db)
+        cp = await course_repo.get_course_performance(ctx, db, filters)
         if not cp["averageByCourse"]:
             return "There are no recorded attempts in your courses yet."
         lines = ", ".join(f"{c['course']} averages {c['average']}" for c in cp["averageByCourse"][:4])
         return f"Across the curricula in scope: {lines}."
 
     if domain == "item_analysis":
-        ia = await item_repo.get_item_analysis(ctx, db)
+        ia = await item_repo.get_item_analysis(ctx, db, filters)
         if not ia["needsReview"]:
             return (
                 "No items are flagged right now — either quality looks fine, or no "
@@ -178,13 +182,13 @@ async def _answer(ctx: UserContext, db: asyncpg.Connection, domain: DataDomain) 
         )
 
     if domain == "integrity_monitoring":
-        ir = await integrity_repo.get_integrity_report(ctx, db)
+        ir = await integrity_repo.get_integrity_report(ctx, db, filters)
         if not ir["totalAttempts"]:
             return "There are no monitored attempts in this scope."
         return f"{ir['flaggedCount']} of {ir['totalAttempts']} monitored attempts show at least one anomaly."
 
     if domain == "institution_kpis":
-        mo = await mgmt_repo.get_management_overview(ctx, db)
+        mo = await mgmt_repo.get_management_overview(ctx, db, filters)
         kpis = ", ".join(f"{k['label']}: {k['value']}" for k in mo["kpis"])
         return f"{kpis}. {mo['insight']}"
 
@@ -211,4 +215,5 @@ async def get_chat_answer(ctx: UserContext, db: asyncpg.Connection, question: st
     allowed = DOMAIN_ALLOW.get(ctx.role, set())
     if domain not in allowed:
         return {"text": refusal_for(ctx.role, domain), "blocked": True}
-    return {"text": await _answer(ctx, db, domain), "blocked": False}
+    filters = await validate_analytics_filters(ctx, db, AnalyticsFilters(), require_complete=False)
+    return {"text": await _answer(ctx, db, domain, filters), "blocked": False}

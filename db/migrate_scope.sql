@@ -1,3 +1,7 @@
+-- SUPERSEDED. Do not apply this file to a live database.
+-- Source of truth is db/schema.sql (fresh) and db/migrations/ (existing).
+-- This file is retained only as historical context for the RLS helper pattern.
+--
 -- Restore org-scoped RLS without infinite recursion.
 -- Apply as the table owner (postgres), not app_user.
 

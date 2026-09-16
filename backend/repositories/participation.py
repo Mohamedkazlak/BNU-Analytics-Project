@@ -1,16 +1,33 @@
 import asyncpg
+
+from core.utils import avg, round1
+from repositories.sql_filters import attempt_where
 from schemas.auth import UserContext
-from core.utils import avg, round1, PASS_MARK
+from schemas.filters import AnalyticsFilters
 
 
-async def get_participation_report(ctx: UserContext, db: asyncpg.Connection):
-    rows = await db.fetch("""
-        SELECT a.id, a.student_id, s.name AS student_name, a.exam_id, a.exam_title, a.course_code,
-               a.participated, a.late_start, a.time_taken_min, a.status
+async def get_participation_report(
+    ctx: UserContext,
+    db: asyncpg.Connection,
+    filters: AnalyticsFilters | None = None,
+):
+    filters = filters or AnalyticsFilters()
+    where_sql, args, _ = attempt_where(filters)
+
+    exam_rows = await db.fetch(
+        f"""
+        SELECT
+            split_part(a.exam_title, '—', 1) AS exam,
+            COUNT(*) FILTER (WHERE a.participated) AS attempts,
+            COUNT(*) AS expected,
+            COALESCE(AVG(a.time_taken_min) FILTER (WHERE a.participated AND a.time_taken_min IS NOT NULL), 0) AS minutes
         FROM v_exam_attempts a
-        JOIN v_students s ON s.id = a.student_id
-    """)
-    if not rows:
+        WHERE {where_sql}
+        GROUP BY a.exam_id, a.exam_title
+        """,
+        *args,
+    )
+    if not exam_rows:
         return {
             "attemptsPerExam": [],
             "completionRate": 0,
@@ -21,71 +38,74 @@ async def get_participation_report(ctx: UserContext, db: asyncpg.Connection):
             "insight": "No attendance rows in this scope yet.",
         }
 
-    by_exam = {}
-    for r in rows:
-        e = by_exam.setdefault(
-            r["exam_id"],
-            {"title": r["exam_title"], "course": r["course_code"], "rows": []},
-        )
-        e["rows"].append(r)
     attempts_per_exam = [
-        {
-            "exam": v["title"].split("—")[0].strip(),
-            "attempts": sum(1 for r in v["rows"] if r["participated"]),
-            "expected": len(v["rows"]),
-        }
-        for v in by_exam.values()
+        {"exam": (r["exam"] or "").strip(), "attempts": int(r["attempts"]), "expected": int(r["expected"])}
+        for r in exam_rows
     ]
     avg_time_per_exam = [
-        {
-            "exam": v["title"].split("—")[0].strip(),
-            "minutes": round(
-                avg(
-                    [
-                        r["time_taken_min"]
-                        for r in v["rows"]
-                        if r["participated"] and r["time_taken_min"]
-                    ]
-                )
-            ),
-        }
-        for v in by_exam.values()
+        {"exam": (r["exam"] or "").strip(), "minutes": round(float(r["minutes"]))}
+        for r in exam_rows
     ]
 
-    taken = [r for r in rows if r["participated"]]
-    completion_rate = round1(len(taken) / len(rows) * 100) if rows else 0
+    totals = await db.fetchrow(
+        f"""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE a.participated) AS taken
+        FROM v_exam_attempts a
+        WHERE {where_sql}
+        """,
+        *args,
+    )
+    completion_rate = round1((totals["taken"] / totals["total"] * 100) if totals["total"] else 0)
 
-    by_course = {}
-    for r in rows:
-        c = by_course.setdefault(r["course_code"], [])
-        c.append(r)
-    attendance_by_curriculum = []
-    for course, course_rows in by_course.items():
-        present = sum(
-            1 for r in course_rows if r["participated"] and not r["late_start"]
-        )
-        absent = sum(1 for r in course_rows if not r["participated"])
-        attendance_by_curriculum.append(
-            {
-                "course": course,
-                "attendance": (
-                    round1(present / len(course_rows) * 100) if course_rows else 0
-                ),
-                "absentees": absent,
-            }
-        )
+    course_rows = await db.fetch(
+        f"""
+        SELECT
+            a.course_code AS course,
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE a.participated AND NOT a.late_start) AS present,
+            COUNT(*) FILTER (WHERE NOT a.participated) AS absentees
+        FROM v_exam_attempts a
+        WHERE {where_sql}
+        GROUP BY a.course_code
+        """,
+        *args,
+    )
+    attendance_by_curriculum = [
+        {
+            "course": r["course"],
+            "attendance": round1((r["present"] / r["total"] * 100) if r["total"] else 0),
+            "absentees": int(r["absentees"]),
+        }
+        for r in course_rows
+    ]
     attendance_rate = round1(avg([r["attendance"] for r in attendance_by_curriculum]))
 
+    absentee_rows = await db.fetch(
+        f"""
+        SELECT
+            s.name AS student,
+            a.course_code || ' · ' || split_part(a.exam_title, '—', 1) AS exam,
+            CASE WHEN a.participated THEN 'Late start' ELSE 'No attempt' END AS reason
+        FROM v_exam_attempts a
+        JOIN v_students s ON s.id = a.student_id
+        WHERE {where_sql}
+          AND (NOT a.participated OR a.late_start)
+        ORDER BY s.name
+        LIMIT 12
+        """,
+        *args,
+    )
     absentees = [
         {
-            "student": r["student_name"],
-            "exam": f"{r['course_code']} · {r['exam_title'].split('—')[0].strip()}",
-            "reason": "Late start" if r["participated"] else "No attempt",
+            "student": r["student"],
+            "exam": (r["exam"] or "").strip(),
+            "reason": r["reason"],
             "minutesLate": 0,
         }
-        for r in rows
-        if (not r["participated"] or r["late_start"])
-    ][:12]
+        for r in absentee_rows
+    ]
 
     weakest = (
         sorted(attendance_by_curriculum, key=lambda x: x["attendance"])[0]

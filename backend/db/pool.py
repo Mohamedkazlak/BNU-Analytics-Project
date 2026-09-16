@@ -1,40 +1,52 @@
-from fastapi import Request
 import asyncpg
-from core.config import settings
-from urllib.parse import urlparse, urlunparse
+from fastapi import Request
 
-def get_app_user_db_url(url: str) -> str:
-    parsed = urlparse(url)
-    if parsed.scheme in ("postgres", "postgresql"):
-        original_user = parsed.username
-        new_user = "app_user"
-        if original_user and "." in original_user:
-            # Supabase connection pooler format: user.project_ref
-            project_ref = original_user.split(".", 1)[1]
-            new_user = f"app_user.{project_ref}"
-        
-        netloc = f"{new_user}:app_user_password_demo_123@{parsed.hostname}"
-        if parsed.port:
-            netloc += f":{parsed.port}"
-        parsed = parsed._replace(netloc=netloc)
-        return urlunparse(parsed)
-    return url
+from core.config import settings
+
+
+async def _assert_rls_role(connection: asyncpg.Connection) -> None:
+    """Refuse a production connection that would silently bypass RLS."""
+    bypass = await connection.fetchval(
+        """
+        SELECT rolbypassrls OR rolsuper
+        FROM pg_roles
+        WHERE rolname = current_user
+        """
+    )
+    if not bypass:
+        return
+    message = (
+        "DATABASE_URL is connected as a role that bypasses row-level security "
+        f"(current_user={await connection.fetchval('select current_user')}). "
+        "Point DATABASE_URL at a non-BYPASSRLS role such as app_user. "
+        "Do not store that password in git; set it out of band with ALTER ROLE."
+    )
+    if settings.APP_ENV == "production":
+        raise RuntimeError(message)
+    print(f"WARNING: {message}")
+
 
 async def create_pool():
-    # Use app_user for the connection pool
-    pool_url = get_app_user_db_url(settings.DATABASE_URL)
-    return await asyncpg.create_pool(pool_url)
+    pool = await asyncpg.create_pool(
+        settings.DATABASE_URL,
+        min_size=1,
+        max_size=10,
+        command_timeout=20,
+        server_settings={"statement_timeout": "15000"},
+    )
+    async with pool.acquire() as connection:
+        await _assert_rls_role(connection)
+    return pool
+
 
 async def get_db_conn(request: Request):
-    """
-    Dependency that acquires a connection from the pool, begins a transaction,
-    and sets `app.current_user_id` if the user is authenticated.
-    """
+    """Acquire a connection and set the transaction-local user context."""
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
             user_ctx = getattr(request.state, "user", None)
             if user_ctx:
                 await connection.execute(
-                    "SELECT set_config('app.current_user_id', $1, true)", user_ctx.user_id
+                    "SELECT set_config('app.current_user_id', $1, true)",
+                    user_ctx.user_id,
                 )
             yield connection

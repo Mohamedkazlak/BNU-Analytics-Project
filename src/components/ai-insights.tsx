@@ -1,23 +1,46 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, ChevronDown, CircleCheck, Lightbulb, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronDown,
+  CircleCheck,
+  Lightbulb,
+  TrendingDown,
+  TrendingUp,
+  Minus,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 import { aiConfig } from "@/lib/ai-config";
-import { getInsight, getPrediction, type Insight, type Prediction, type RiskCase } from "@/lib/ai-insights";
-import { getRecommendations, type Recommendation } from "@/lib/ai-recommendations";
+import {
+  getAiDecision,
+  type Insight,
+  type Prediction,
+  type RiskCase,
+} from "@/lib/ai-insights";
+import type { Recommendation } from "@/lib/ai-recommendations";
 import { useRole } from "./role-context";
+import { useFilteredQuery } from "@/hooks/use-analytics-filters";
 
-const EMPTY_COPY = "Not enough data yet to generate insights — check back after your next exam.";
+const EMPTY_COPY =
+  "Not enough data yet to generate insights — check back after your next exam.";
 
-export function AiFrame({ label, children }: { label: string; children: React.ReactNode }) {
+export function AiFrame({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-3xl border-2 border-ai/60 bg-gradient-to-br from-violet/10 via-iris/5 to-cyan/10 p-5 backdrop-blur-xl">
       <div className="flex items-center gap-2">
         <Lightbulb className="size-4 text-ai" strokeWidth={2.4} />
-        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ai">{label}</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ai">
+          {label}
+        </span>
       </div>
       {children}
     </section>
@@ -60,11 +83,18 @@ function RiskCaseRow({ item }: { item: RiskCase }) {
     <div className="rounded-2xl border border-white/70 bg-white/65 p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[13px] font-semibold text-ink">{item.subject}</div>
+          <div className="text-[13px] font-semibold text-ink">
+            {item.subject}
+          </div>
           <div className="text-[11px] text-ink-soft">{item.exam}</div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", levelTone[item.level])}>
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+              levelTone[item.level],
+            )}
+          >
             {item.level} · {item.score}/100
           </span>
           <button
@@ -73,19 +103,29 @@ function RiskCaseRow({ item }: { item: RiskCase }) {
             className="inline-flex items-center gap-1 rounded-full border border-ai/40 px-2.5 py-1 text-[11px] font-semibold text-ai"
           >
             Why
-            <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+            <ChevronDown
+              className={cn(
+                "size-3.5 transition-transform",
+                open && "rotate-180",
+              )}
+            />
           </button>
         </div>
       </div>
       {open && (
         <ul className="mt-3 space-y-2 border-t border-black/5 pt-3">
           {item.evidence.map((e) => (
-            <li key={e.label} className="flex items-start justify-between gap-3 text-[12px]">
+            <li
+              key={e.label}
+              className="flex items-start justify-between gap-3 text-[12px]"
+            >
               <span>
                 <span className="font-semibold text-ink">{e.label}</span>
                 <span className="text-ink-soft"> — {e.detail}</span>
               </span>
-              <span className="shrink-0 font-semibold text-ai">+{e.weight}</span>
+              <span className="shrink-0 font-semibold text-ai">
+                +{e.weight}
+              </span>
             </li>
           ))}
         </ul>
@@ -95,31 +135,51 @@ function RiskCaseRow({ item }: { item: RiskCase }) {
 }
 
 const dirIcon = { rising: TrendingUp, falling: TrendingDown, stable: Minus };
-const toneClass = { mint: "text-mintink", amber: "text-amberink", rose: "text-rosee", iris: "text-iris" };
+const toneClass = {
+  mint: "text-mintink",
+  amber: "text-amberink",
+  rose: "text-rosee",
+  iris: "text-iris",
+};
 
-/** Compact inline trajectory strip — trend icon plus the forecast rows. */
+/** Compact inline standing strip — trend icon plus the current-term rows. */
 function Trajectory({ data }: { data: Prediction }) {
   const Icon = dirIcon[data.direction];
+  const heading =
+    data.kind === "forecast" ? data.title : data.title || "Current standing";
   return (
     <div className="mt-3 rounded-2xl border border-white/70 bg-white/55 px-3.5 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <Icon
           className={cn(
             "size-4",
-            data.direction === "falling" ? "text-rosee" : data.direction === "rising" ? "text-amberink" : "text-ink-soft",
+            data.direction === "falling"
+              ? "text-rosee"
+              : data.direction === "rising"
+                ? "text-amberink"
+                : "text-ink-soft",
           )}
           strokeWidth={2.4}
         />
-        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-soft">{data.title}</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-soft">
+          {heading}
+        </span>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {data.rows.map((row) => (
             <span key={row.label} className="text-[11.5px]">
               <span className="text-ink-soft">{row.label} </span>
-              <span className={cn("font-semibold", toneClass[row.tone])}>{row.value}</span>
+              <span className={cn("font-semibold", toneClass[row.tone])}>
+                {row.value}
+              </span>
             </span>
           ))}
         </div>
       </div>
+      {data.summary ? (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
+          {data.summary}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -138,11 +198,15 @@ function BasedOn({ item }: { item: Recommendation }) {
         className="inline-flex items-center gap-1 text-[11px] font-semibold text-ai/90 underline decoration-ai/30 underline-offset-2"
       >
         Based on
-        <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          className={cn("size-3 transition-transform", open && "rotate-180")}
+        />
       </button>
       {open && (
         <div className="mt-2 rounded-2xl bg-white/70 p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-soft">{item.basedOn.source}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-soft">
+            {item.basedOn.source}
+          </div>
           <ul className="mt-1.5 space-y-1">
             {item.basedOn.evidence.map((e) => (
               <li key={e.label} className="text-[12px] leading-relaxed">
@@ -166,7 +230,13 @@ export interface ConfirmAction {
   confirmLabel: string;
 }
 
-export function ConfirmDialog({ action, onClose }: { action: ConfirmAction; onClose: () => void }) {
+export function ConfirmDialog({
+  action,
+  onClose,
+}: {
+  action: ConfirmAction;
+  onClose: () => void;
+}) {
   const navigate = useNavigate();
   function confirm() {
     onClose();
@@ -174,18 +244,36 @@ export function ConfirmDialog({ action, onClose }: { action: ConfirmAction; onCl
       navigate({ to: action.to });
       return;
     }
-    toast.success(action.confirmLabel === "Export" ? "Report queued for export" : "Done — nothing was sent automatically");
+    toast.success(
+      action.confirmLabel === "Export"
+        ? "Report queued for export"
+        : "Done — nothing was sent automatically",
+    );
   }
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/30 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/30 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="w-full max-w-md rounded-3xl border-2 border-ai/50 bg-white p-5 shadow-2xl">
-        <h4 className="font-display text-[16px] font-bold text-ink">{action.confirmTitle}</h4>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">{action.confirmBody}</p>
+        <h4 className="font-display text-[16px] font-bold text-ink">
+          {action.confirmTitle}
+        </h4>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
+          {action.confirmBody}
+        </p>
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-full border border-black/10 px-4 py-2 text-[12px] font-semibold text-ink">
+          <button
+            onClick={onClose}
+            className="rounded-full border border-black/10 px-4 py-2 text-[12px] font-semibold text-ink"
+          >
             Cancel
           </button>
-          <button onClick={confirm} className="rounded-full bg-ai px-4 py-2 text-[12px] font-semibold text-white shadow-lg shadow-ai/25">
+          <button
+            onClick={confirm}
+            className="rounded-full bg-ai px-4 py-2 text-[12px] font-semibold text-white shadow-lg shadow-ai/25"
+          >
             {action.confirmLabel}
           </button>
         </div>
@@ -198,37 +286,30 @@ export function ConfirmDialog({ action, onClose }: { action: ConfirmAction; onCl
  * The single merged decision card
  * ------------------------------------------------------------------ */
 
-interface Decision {
-  insight: Insight | null;
-  prediction: Prediction | null;
-  recommendations: Recommendation[];
-}
-
 /**
- * One combined read: headline finding, trajectory and ranked actions.
- * Every loader below calls the backend, which derives role/scope from the
- * verified JWT and re-applies its own permission gate server-side — the
- * `role` here only controls which panels this client bothers to render.
+ * One combined read: headline finding, current standing and ranked actions.
+ * Role/scope come from the verified JWT on the server. The `role` prop only
+ * controls which panels this client renders.
  */
-async function getDecision(role: Role, traceId: string): Promise<Decision> {
-  const [insight, prediction, recommendations] = await Promise.all([
-    aiConfig.showInsights[role] ? getInsight() : Promise.resolve(null),
-    aiConfig.showPredictions[role] ? getPrediction() : Promise.resolve(null),
-    getRecommendations(traceId),
-  ]);
-  return { insight, prediction, recommendations: recommendations?.items ?? [] };
-}
 
-function WarningsStrip({ warnings }: { warnings: NonNullable<Insight["warnings"]> }) {
+function WarningsStrip({
+  warnings,
+}: {
+  warnings: NonNullable<Insight["warnings"]>;
+}) {
   return (
     <div className="mt-4 space-y-2">
-      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-amberink">Warnings</div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-amberink">
+        Warnings
+      </div>
       {warnings.map((w) => (
         <div
           key={w.id}
           className={cn(
             "flex items-start gap-2 rounded-2xl px-3.5 py-2.5 text-[12.5px] font-medium",
-            w.tone === "rose" ? "bg-rose/10 text-rosee" : "bg-amber/12 text-amberink",
+            w.tone === "rose"
+              ? "bg-rose/10 text-rosee"
+              : "bg-amber/12 text-amberink",
           )}
         >
           <AlertCircle className="mt-0.5 size-3.5 shrink-0" strokeWidth={2.2} />
@@ -239,35 +320,70 @@ function WarningsStrip({ warnings }: { warnings: NonNullable<Insight["warnings"]
   );
 }
 
-export function AiDecisionCard({ role: roleProp, insightId }: { role?: Role; insightId?: string }) {
+export function AiDecisionCard({
+  role: roleProp,
+  insightId,
+}: {
+  role?: Role;
+  insightId?: string;
+}) {
   const { role: contextRole, user } = useRole();
   const role = roleProp ?? contextRole;
   const traceId = insightId ?? `insight-${role}-${user.id}`;
   const [pendingItem, setPendingItem] = useState<Recommendation | null>(null);
+  const { filters, filtersReady, queryKey, enabled } =
+    useFilteredQuery("ai-decision");
   const { data, isPending } = useQuery({
-    queryKey: ["ai-decision", role, user.id, traceId],
-    queryFn: () => getDecision(role, traceId),
+    queryKey: [...queryKey, role, traceId],
+    queryFn: () => getAiDecision(filters),
+    enabled,
+    retry: false,
+    staleTime: 30_000,
   });
 
   const label = role === "student" ? "Recommendations" : "AI decision";
 
+  if (!filtersReady) return null;
   if (isPending) return <AiSkeleton label={label} />;
-  if (!data || (!data.insight && data.recommendations.length === 0))
+
+  if (data?.status === "timeout" || data?.status === "unavailable") {
+    return (
+      <AiFrame label={label}>
+        <p className="mt-2 text-[13px] text-ink-soft">
+          {data.message || "AI analysis is taking longer than expected."}
+        </p>
+      </AiFrame>
+    );
+  }
+
+  const insight = aiConfig.showInsights[role] ? (data?.insight ?? null) : null;
+  const prediction = aiConfig.showPredictions[role]
+    ? (data?.prediction ?? null)
+    : null;
+  const recommendations = data?.recommendations?.items ?? [];
+
+  if (!insight && recommendations.length === 0 && !prediction)
     return (
       <AiFrame label={label}>
         <p className="mt-2 text-[13px] text-ink-soft">{EMPTY_COPY}</p>
       </AiFrame>
     );
 
-  const { insight, prediction, recommendations } = data;
-  const showWarnings = aiConfig.showWarnings[role] && insight?.warnings && insight.warnings.length > 0;
+  const showWarnings =
+    aiConfig.showWarnings[role] &&
+    insight?.warnings &&
+    insight.warnings.length > 0;
 
   return (
     <AiFrame label={label}>
       {insight && (
         <>
-          <h3 className="font-display mt-2 text-[15px] font-bold text-ink">{insight.headline}</h3>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-ink">{insight.body}</p>
+          <h3 className="font-display mt-2 text-[15px] font-bold text-ink">
+            {insight.headline}
+          </h3>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-ink">
+            {insight.body}
+          </p>
         </>
       )}
 
@@ -275,12 +391,22 @@ export function AiDecisionCard({ role: roleProp, insightId }: { role?: Role; ins
 
       {showWarnings && <WarningsStrip warnings={insight!.warnings!} />}
 
-      {insight?.cases && <div className="mt-4 space-y-2.5">{insight.cases.map((c) => <RiskCaseRow key={c.id} item={c} />)}</div>}
+      {insight?.cases && (
+        <div className="mt-4 space-y-2.5">
+          {insight.cases.map((c) => (
+            <RiskCaseRow key={c.id} item={c} />
+          ))}
+        </div>
+      )}
 
       <div className="mt-5">
-        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-ai">Recommended actions</div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-ai">
+          Recommended actions
+        </div>
         {recommendations.length === 0 ? (
-          <p className="mt-2 text-[13px] text-ink-soft">No actions needed right now — you're on track.</p>
+          <p className="mt-2 text-[13px] text-ink-soft">
+            No actions needed right now — you're on track.
+          </p>
         ) : (
           <ul className="mt-3 space-y-2.5">
             {recommendations.map((item) => {
@@ -289,11 +415,16 @@ export function AiDecisionCard({ role: roleProp, insightId }: { role?: Role; ins
                 <li key={item.id} className="rounded-2xl bg-white/60 p-3.5">
                   <div className="flex items-start gap-3">
                     <Icon
-                      className={cn("mt-0.5 size-4 shrink-0", item.kind === "action" ? "text-ai" : "text-amberink")}
+                      className={cn(
+                        "mt-0.5 size-4 shrink-0",
+                        item.kind === "action" ? "text-ai" : "text-amberink",
+                      )}
                       strokeWidth={2.2}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium leading-relaxed text-ink">{item.text}</p>
+                      <p className="text-[13px] font-medium leading-relaxed text-ink">
+                        {item.text}
+                      </p>
                       <BasedOn item={item} />
                     </div>
                     {item.action && (
@@ -313,8 +444,15 @@ export function AiDecisionCard({ role: roleProp, insightId }: { role?: Role; ins
       </div>
 
       {insight?.action && <AiAction {...insight.action} />}
-      <p className="mt-3 text-[11px] text-ink-soft">Traced to {traceId} · every action asks you to confirm first.</p>
-      {pendingItem && <ConfirmDialog action={pendingItem.action!} onClose={() => setPendingItem(null)} />}
+      <p className="mt-3 text-[11px] text-ink-soft">
+        Traced to {traceId} · every action asks you to confirm first.
+      </p>
+      {pendingItem && (
+        <ConfirmDialog
+          action={pendingItem.action!}
+          onClose={() => setPendingItem(null)}
+        />
+      )}
     </AiFrame>
   );
 }
@@ -323,5 +461,10 @@ export function AiDecisionCard({ role: roleProp, insightId }: { role?: Role; ins
 export function AiDecisionSection({ role }: { role?: Role }) {
   const { role: contextRole } = useRole();
   const effective = role ?? contextRole;
-  return <AiDecisionCard {...(role ? { role } : {})} insightId={`insight-${effective}`} />;
+  return (
+    <AiDecisionCard
+      {...(role ? { role } : {})}
+      insightId={`insight-${effective}`}
+    />
+  );
 }

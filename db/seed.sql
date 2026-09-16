@@ -1,7 +1,8 @@
 -- BNU Analytics demo seed
--- Mirrors src/lib/mock-data.ts (same ids). Exam-attempt scores are generated
--- in SQL with a deterministic hash, so they will not match the TypeScript PRNG
--- exactly — the relational graph (who sits which exam) does match.
+-- Deterministic, reproducible synthetic dataset. People/students represent a
+-- demo roster; exams, questions, attempts, answers, flags and transcripts are
+-- generated with hash-based variation (high / average / weak performers,
+-- absences, late starts, mixed letter grades) and marked is_synthetic = true.
 --
 -- Apply after schema.sql:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/seed.sql
@@ -478,18 +479,48 @@ select
   st.id,
   c.id,
   y.id,
-  round((32 + (abs(hashtext(st.id || c.id || y.id)) % 67))::numeric, 1),
+  round((18 + (abs(hashtext(st.id || c.id || y.id)) % 82))::numeric, 1),
   case
-    when (32 + (abs(hashtext(st.id || c.id || y.id)) % 67)) >= 90 then 'A+'
-    when (32 + (abs(hashtext(st.id || c.id || y.id)) % 67)) >= 80 then 'A'
-    when (32 + (abs(hashtext(st.id || c.id || y.id)) % 67)) >= 70 then 'B'
-    when (32 + (abs(hashtext(st.id || c.id || y.id)) % 67)) >= 60 then 'C'
-    else 'D'
+    when (18 + (abs(hashtext(st.id || c.id || y.id)) % 82)) >= 90 then 'A+'
+    when (18 + (abs(hashtext(st.id || c.id || y.id)) % 82)) >= 85 then 'A'
+    when (18 + (abs(hashtext(st.id || c.id || y.id)) % 82)) >= 80 then 'B+'
+    when (18 + (abs(hashtext(st.id || c.id || y.id)) % 82)) >= 70 then 'B'
+    when (18 + (abs(hashtext(st.id || c.id || y.id)) % 82)) >= 60 then 'C'
+    when (18 + (abs(hashtext(st.id || c.id || y.id)) % 82)) >= 50 then 'D'
+    else 'F'
   end,
   c.credits
 from students st
 join academic_years y on y.is_current = false
 join courses c on c.program_id = st.program_id
   and c.year_level = case y.id when '2023/24' then 1 else 2 end;
+
+-- Catalog rows keep conservative curriculum defaults from schema.sql:
+-- requirement_level_type = 'college', counted_in_cumulative_gpa = true,
+-- pass_fail_subject = false. Do not invent classifications from year_level
+-- or hard-code a demo course as pass/fail.
+
+insert into attempt_answers (attempt_id, question_id, is_correct, points, is_synthetic)
+select
+  a.id,
+  q.id,
+  (abs(hashtext(a.id || q.id || 'ans')) % 100)
+    >= (12 + ((q.number * 7 + abs(hashtext(a.student_id))) % 55)),
+  case
+    when (abs(hashtext(a.id || q.id || 'ans')) % 100)
+      >= (12 + ((q.number * 7 + abs(hashtext(a.student_id))) % 55))
+    then q.max_score
+    else 0
+  end,
+  true
+from exam_attempts a
+join questions q on q.exam_id = a.exam_id
+where a.status <> 'absent';
+
+update exams set is_synthetic = true;
+update questions set is_synthetic = true;
+update exam_attempts set is_synthetic = true;
+update integrity_flags set is_synthetic = true;
+update transcript_entries set is_synthetic = true;
 
 commit;

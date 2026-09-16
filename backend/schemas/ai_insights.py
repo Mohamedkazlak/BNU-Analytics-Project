@@ -53,6 +53,7 @@ class Prediction(BaseModel):
     summary: str
     rows: List[PredictionRow]
     action: Optional[PredictionAction] = None
+    kind: Literal["current_standing", "forecast"] = "current_standing"
 
 
 class RecommendationEvidence(BaseModel):
@@ -80,11 +81,22 @@ class Recommendation(BaseModel):
     text: str
     basedOn: RecommendationBasedOn
     action: Optional[RecommendationAction] = None
+    metric: Optional[str] = None
+    value: Optional[float] = None
+    threshold: Optional[float] = None
 
 
 class RecommendationSet(BaseModel):
     insightId: str
     items: List[Recommendation]
+
+
+class AiDecision(BaseModel):
+    insight: Optional[Insight] = None
+    prediction: Optional[Prediction] = None
+    recommendations: Optional[RecommendationSet] = None
+    status: Literal["ok", "timeout", "unavailable"] = "ok"
+    message: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
