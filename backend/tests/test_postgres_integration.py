@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
 
 import pytest
 
@@ -22,7 +22,6 @@ SEED = ROOT / "db" / "seed.sql"
 ADMIN_URL = os.getenv("TEST_DATABASE_URL") or os.getenv(
     "DATABASE_ADMIN_URL", "postgresql://postgres@localhost:5432/postgres"
 )
-APP_PASSWORD = "bnu-test-app-pass"
 FRESH_DB = "bnu_analytics_ci_fresh"
 MIGRATED_DB = "bnu_analytics_ci_migrated"
 
@@ -38,7 +37,12 @@ def _app_url(dbname: str) -> str:
     parsed = urlparse(ADMIN_URL)
     host = parsed.hostname or "localhost"
     port = f":{parsed.port}" if parsed.port else ""
-    return f"postgresql://app_user:{APP_PASSWORD}@{host}{port}/{dbname}"
+    password = parsed.password
+    if password:
+        netloc = f"app_user:{quote(password, safe='')}@{host}{port}"
+    else:
+        netloc = f"app_user@{host}{port}"
+    return urlunparse(parsed._replace(netloc=netloc, path=f"/{dbname}"))
 
 
 def _psql(url: str, *args: str, sql: str | None = None) -> subprocess.CompletedProcess:
@@ -83,7 +87,13 @@ def _apply_file(url: str, path: Path) -> None:
 def _prepare_app_user(url: str) -> None:
     parsed = urlparse(url)
     dbname = parsed.path.lstrip("/")
-    alter = _psql(url, sql=f"ALTER ROLE app_user LOGIN PASSWORD '{APP_PASSWORD}';")
+    password = urlparse(ADMIN_URL).password
+    if password:
+        escaped = password.replace("'", "''")
+        alter_sql = "ALTER ROLE app_user LOGIN PASSWORD '" + escaped + "';"
+    else:
+        alter_sql = "ALTER ROLE app_user LOGIN;"
+    alter = _psql(url, sql=alter_sql)
     if alter.returncode != 0:
         pytest.fail(alter.stderr)
     grant = _psql(ADMIN_URL, "-c", f'GRANT CONNECT ON DATABASE "{dbname}" TO app_user')
@@ -289,9 +299,7 @@ def test_migration_runner_skips_already_applied(migrated_db):
     assert (
         "skip 009_disable_schema_migrations_rls.sql (already applied)" in runner.stdout
     )
-    assert (
-        "skip 010_syn_transc_marker_backfill.sql (already applied)" in runner.stdout
-    )
+    assert "skip 010_syn_transc_marker_backfill.sql (already applied)" in runner.stdout
     assert not any(line.startswith("applied ") for line in runner.stdout.splitlines())
 
 
@@ -566,9 +574,7 @@ def test_migration_010_backfills_unmarked_syn_transc_via_runner():
     log = asyncio.run(apply_migrations(url, DEFAULT_MIGRATIONS_DIR))
     assert "applied 010_syn_transc_marker_backfill.sql" in log
     assert "skip 003_synthetic-data-markers.sql (already applied)" in log
-    assert not any(
-        line.startswith("applied ") and "010_" not in line for line in log
-    )
+    assert not any(line.startswith("applied ") and "010_" not in line for line in log)
 
     after = asyncio.run(
         _fetch(
