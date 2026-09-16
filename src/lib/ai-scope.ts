@@ -86,14 +86,21 @@ export function resolveScope(session: ScopeSession): Scope {
           "anonymized_cohort",
           "named_students",
         ],
-        courseIds: session.canSeeAllCourses ? undefined : (session.courseIds ?? []),
+        courseIds: session.canSeeAllCourses
+          ? undefined
+          : (session.courseIds ?? []),
       };
     case "it_academic_integrity":
       // Global scope (null) — monitoring signals across the university.
       return {
         ...base,
         scopeId: null,
-        allow: ["integrity_monitoring", "named_students", "anonymized_cohort", "institution_kpis"],
+        allow: [
+          "integrity_monitoring",
+          "named_students",
+          "anonymized_cohort",
+          "institution_kpis",
+        ],
         canSeeAllCourses: true,
       };
     case "academic_affairs":
@@ -154,7 +161,10 @@ export function refusalFor(role: Role, domain: DataDomain): string {
     return "I can't share another student's name, score or personal data. I can compare you against the anonymized class average instead — want that?";
   if (role === "professor" && domain === "all_courses")
     return "That covers courses outside the sections assigned to you. Ask your administrator to enable platform-wide access if you need it.";
-  if (role === "it_academic_integrity" && (domain === "exam_content" || domain === "grading_rationale"))
+  if (
+    role === "it_academic_integrity" &&
+    (domain === "exam_content" || domain === "grading_rationale")
+  )
     return "Integrity access covers monitoring signals only — raw exam content and grading rationale aren't available here.";
   return "That data is outside what your role is authorized to see, so I can't answer it.";
 }

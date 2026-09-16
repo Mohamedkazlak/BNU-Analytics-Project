@@ -16,21 +16,39 @@ const headers: Record<Role, string> = {
 };
 
 const openers: Record<Role, string> = {
-  student: "Hi Omar — ask me about your scores, topics or how you compare with the anonymized class average.",
-  professor: "Ask me about your assigned curricula — scores, item quality, attendance or participation.",
-  it_academic_integrity: "Ask me about any live exam at the university, flagged cases, timing anomalies or IP overlap.",
-  senior_management: "Ask me about pass rates, colleges, participation or integrity trends in the scope you can see.",
-  program_director: "Ask me about every curriculum in your college — pass rates, item quality or student performance.",
-  academic_affairs: "Ask me about student performance, attendance and at-risk students across every curriculum in the college.",
+  student:
+    "Hi Omar — ask me about your scores, topics or how you compare with the anonymized class average.",
+  professor:
+    "Ask me about your assigned curricula — scores, item quality, attendance or participation.",
+  it_academic_integrity:
+    "Ask me about any live exam at the university, flagged cases, timing anomalies or IP overlap.",
+  senior_management:
+    "Ask me about pass rates, colleges, participation or integrity trends in the scope you can see.",
+  program_director:
+    "Ask me about every curriculum in your college — pass rates, item quality or student performance.",
+  academic_affairs:
+    "Ask me about student performance, attendance and at-risk students across every curriculum in the college.",
 };
 
 const suggestions: Record<Role, string[]> = {
   student: ["How am I doing vs the class?", "Which topic is dragging me down?"],
   professor: ["Which questions need review?", "How is section B performing?"],
-  it_academic_integrity: ["Which live exam has flags?", "What drives the highest risk case?"],
-  senior_management: ["Which college is weakest?", "How are pass rates trending?"],
-  program_director: ["Which curriculum is weakest?", "Any flagged items this term?"],
-  academic_affairs: ["Which curriculum has weak attendance?", "Which students are at risk?"],
+  it_academic_integrity: [
+    "Which live exam has flags?",
+    "What drives the highest risk case?",
+  ],
+  senior_management: [
+    "Which college is weakest?",
+    "How are pass rates trending?",
+  ],
+  program_director: [
+    "Which curriculum is weakest?",
+    "Any flagged items this term?",
+  ],
+  academic_affairs: [
+    "Which curriculum has weak attendance?",
+    "Which students are at risk?",
+  ],
 };
 
 interface Msg {
@@ -75,11 +93,23 @@ export function ChatPanel() {
     setPending(true);
     try {
       const answer = await askAssistant(text);
-      setMessages((m) => [...m, { id: Date.now() + 1, from: "ai", text: answer.text, blocked: answer.blocked }]);
+      setMessages((m) => [
+        ...m,
+        {
+          id: Date.now() + 1,
+          from: "ai",
+          text: answer.text,
+          blocked: answer.blocked,
+        },
+      ]);
     } catch {
       setMessages((m) => [
         ...m,
-        { id: Date.now() + 1, from: "ai", text: "Something went wrong answering that — try again in a moment." },
+        {
+          id: Date.now() + 1,
+          from: "ai",
+          text: "Something went wrong answering that — try again in a moment.",
+        },
       ]);
     } finally {
       setPending(false);
@@ -100,27 +130,43 @@ export function ChatPanel() {
         <div className="fixed bottom-6 right-6 z-50 flex h-[min(560px,80vh)] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-white/80 bg-white/95 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
             <div>
-              <div className="text-[13px] font-semibold text-ink">{headers[role]}</div>
-              {context && <div className="text-[11px] text-ink-soft">{context}</div>}
+              <div className="text-[13px] font-semibold text-ink">
+                {headers[role]}
+              </div>
+              {context && (
+                <div className="text-[11px] text-ink-soft">{context}</div>
+              )}
             </div>
-            <button onClick={() => setOpen(false)} className="rounded-full p-1.5 text-ink-soft hover:bg-black/5">
+            <button
+              onClick={() => setOpen(false)}
+              className="rounded-full p-1.5 text-ink-soft hover:bg-black/5"
+            >
               <X className="size-4" />
             </button>
           </div>
 
-          <div ref={threadRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+          <div
+            ref={threadRef}
+            className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
+          >
             {messages.map((m) => (
               <div
                 key={m.id}
                 className={cn(
                   "max-w-[90%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
-                  m.from === "user" ? "ml-auto bg-iris text-white" : m.blocked ? "bg-rose/10 text-rosee" : "bg-iris/8 text-ink",
+                  m.from === "user"
+                    ? "ml-auto bg-iris text-white"
+                    : m.blocked
+                      ? "bg-rose/10 text-rosee"
+                      : "bg-iris/8 text-ink",
                 )}
               >
                 {m.text}
               </div>
             ))}
-            {pending && <div className="text-[12px] text-ink-soft">Thinking…</div>}
+            {pending && (
+              <div className="text-[12px] text-ink-soft">Thinking…</div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-1.5 border-t border-black/5 px-3 py-2">
