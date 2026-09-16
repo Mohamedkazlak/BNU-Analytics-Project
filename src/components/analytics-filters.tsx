@@ -11,6 +11,8 @@ export function AnalyticsFilters() {
     setCollegeId,
     setCurriculumId,
     setStudentId,
+    studentQuery,
+    setStudentQuery,
     filtersReady,
   } = useAnalyticsFilters();
 
@@ -81,14 +83,33 @@ export function AnalyticsFilters() {
           />
         ) : null}
         {showStudent ? (
-          <Select
-            label="Student"
-            value={filters.studentId ?? ""}
-            options={studentOptions}
-            onChange={setStudentId}
-          />
+          <>
+            <Select
+              label="Student"
+              value={filters.studentId ?? ""}
+              options={studentOptions}
+              onChange={setStudentId}
+            />
+            <label className="flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 backdrop-blur-xl">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">
+                Search
+              </span>
+              <input
+                value={studentQuery}
+                onChange={(e) => setStudentQuery(e.target.value)}
+                placeholder="Name or number"
+                className="w-28 bg-transparent text-[11px] font-semibold text-ink outline-none"
+              />
+            </label>
+          </>
         ) : null}
       </FilterBar>
+      {showStudent && options?.hasMoreStudents ? (
+        <p className="text-[12px] text-ink-soft">
+          Showing the first {options.studentPageSize ?? 150} matching students.
+          Search to find others — this limit is not an access control.
+        </p>
+      ) : null}
       {!filtersReady ? (
         <p className="text-[12px] text-ink-soft">
           Select a sector and college to load analytics for that scope.

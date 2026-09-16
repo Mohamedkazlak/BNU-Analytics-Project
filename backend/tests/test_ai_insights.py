@@ -22,7 +22,22 @@ def test_cache_keys_isolate_users_and_filters():
     assert ai_cache.make_cache_key(a, filters) != ai_cache.make_cache_key(a, other_filters)
 
 
-def test_ai_timeout_returns_structured_fallback():
+def test_cache_evicts_when_full():
+    ai_cache.clear()
+    original = ai_cache._MAX_ENTRIES
+    ai_cache._MAX_ENTRIES = 2
+    try:
+        ctx_a = make_user(make_scope(user_id="u-a"))
+        ctx_b = make_user(make_scope(user_id="u-b"))
+        ctx_c = make_user(make_scope(user_id="u-c"))
+        filters = AnalyticsFilters(sector_id="sec-a", college_id="col-a")
+        ai_cache.set(ai_cache.make_cache_key(ctx_a, filters), {"n": 1}, ttl=60)
+        ai_cache.set(ai_cache.make_cache_key(ctx_b, filters), {"n": 2}, ttl=60)
+        ai_cache.set(ai_cache.make_cache_key(ctx_c, filters), {"n": 3}, ttl=60)
+        assert len(ai_cache._CACHE) <= 2
+    finally:
+        ai_cache._MAX_ENTRIES = original
+        ai_cache.clear()
     async def run():
         ctx = make_user(make_scope())
         filters = AnalyticsFilters(sector_id="sec-a", college_id="col-a")
@@ -75,3 +90,20 @@ def test_ai_decision_loads_shared_context_once_and_keeps_filters():
             assert recs["items"][0]["basedOn"]["evidence"]
 
     asyncio.run(run())
+
+
+def test_cache_evicts_when_full():
+    original = ai_cache._MAX_ENTRIES
+    ai_cache._MAX_ENTRIES = 2
+    try:
+        ctx_a = make_user(make_scope(user_id="u-a"))
+        ctx_b = make_user(make_scope(user_id="u-b"))
+        ctx_c = make_user(make_scope(user_id="u-c"))
+        filters = AnalyticsFilters(sector_id="sec-a", college_id="col-a")
+        ai_cache.set(ai_cache.make_cache_key(ctx_a, filters), {"n": 1}, ttl=60)
+        ai_cache.set(ai_cache.make_cache_key(ctx_b, filters), {"n": 2}, ttl=60)
+        ai_cache.set(ai_cache.make_cache_key(ctx_c, filters), {"n": 3}, ttl=60)
+        assert len(ai_cache._CACHE) <= 2
+    finally:
+        ai_cache._MAX_ENTRIES = original
+        ai_cache.clear()

@@ -535,7 +535,24 @@ async def get_ai_decision(
     filters: AnalyticsFilters,
     insight_id: str = "insight",
 ) -> dict:
-    key = ai_cache.make_cache_key(ctx, filters)
+    year_id = await db.fetchval("SELECT id FROM academic_years WHERE is_current LIMIT 1") or ""
+    term_id = ""
+    if year_id:
+        term_id = (
+            await db.fetchval(
+                """
+                SELECT id FROM terms
+                WHERE academic_year_id = $1
+                ORDER BY start_date DESC
+                LIMIT 1
+                """,
+                year_id,
+            )
+            or ""
+        )
+    key = ai_cache.make_cache_key(
+        ctx, filters, academic_year_id=year_id, term_id=term_id
+    )
     cached = ai_cache.get(key)
     if cached is not None:
         return cached

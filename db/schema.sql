@@ -82,15 +82,8 @@ do $$ begin
 exception when duplicate_object then null;
 end $$;
 
-do $$ begin
-  create type requirement_level_type as enum (
-    'university_requirement',
-    'sector_requirement',
-    'program_core',
-    'elective'
-  );
-exception when duplicate_object then null;
-end $$;
+-- requirement_level_type is text constrained to curriculum-report values
+-- ('college', 'university'). It is not an invented sector/core/elective enum.
 
 -- ---------------------------------------------------------------------------
 -- Shared trigger
@@ -252,13 +245,21 @@ create table if not exists courses (
   name text not null,
   credits smallint not null default 3 check (credits between 1 and 12),
   year_level smallint not null default 1 check (year_level between 1 and 6),
-  requirement_level_type requirement_level_type not null default 'program_core',
+  requirement_level_type text not null default 'college'
+    check (requirement_level_type in ('college', 'university')),
   counted_in_cumulative_gpa boolean not null default true,
   pass_fail_subject boolean not null default false,
   unique (program_id, code)
 );
 
 create index if not exists courses_program_id_idx on courses (program_id);
+
+comment on column courses.requirement_level_type is
+  'Curriculum-report requirement level: college or university. Default college is a placeholder until authoritative metadata is imported.';
+comment on column courses.counted_in_cumulative_gpa is
+  'When false the course is excluded from cumulative GPA. Independent of pass_fail_subject.';
+comment on column courses.pass_fail_subject is
+  'When true the course does not contribute letter-grade quality points to cumulative GPA.';
 
 create table if not exists course_offerings (
   id text primary key,
@@ -563,6 +564,10 @@ begin
     return null;
   end if;
   select * into rec from user_accounts where id = uid;
+  if not found then
+    return null;
+  end if;
+  rec.password_hash := null;
   return rec;
 end;
 $$;
@@ -601,6 +606,96 @@ begin
   else
     return query select node.id;
   end if;
+end;
+$$;
+
+create or replace function org_unit_is_visible(p_id text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+declare
+  acct user_accounts;
+  node org_units;
+  target org_units;
+begin
+  acct := current_app_account();
+  if acct is null or p_id is null then
+    return false;
+  end if;
+
+  select * into target from org_units where id = p_id;
+  if not found then
+    return false;
+  end if;
+
+  -- University root is needed for labels / filter ancestry by every role.
+  if target.level = 'university' then
+    return true;
+  end if;
+
+  if acct.scope_id is not null and p_id = acct.scope_id then
+    return true;
+  end if;
+
+  -- University-wide monitoring: sectors and colleges are required for filters.
+  if acct.role = 'it_academic_integrity' then
+    return true;
+  end if;
+
+  if acct.role = 'senior_management' then
+    if acct.scope_id is null then
+      return false;
+    end if;
+    select * into node from org_units where id = acct.scope_id;
+    if not found then
+      return false;
+    end if;
+    if node.level = 'university' then
+      return true;
+    end if;
+    if node.level = 'sector' then
+      return p_id = node.id
+          or (target.level = 'program' and target.parent_id = node.id);
+    end if;
+    return p_id = node.id or p_id = node.parent_id;
+  end if;
+
+  if acct.role in ('program_director', 'academic_affairs') then
+    if acct.scope_id is null then
+      return false;
+    end if;
+    select * into node from org_units where id = acct.scope_id;
+    if not found then
+      return false;
+    end if;
+    return p_id = node.id or p_id = node.parent_id;
+  end if;
+
+  if acct.role = 'professor' then
+    return exists (
+      select 1
+      from courses c
+      join org_units p on p.id = c.program_id
+      where c.id in (select current_professor_course_ids())
+        and (p.id = p_id or p.parent_id = p_id)
+    );
+  end if;
+
+  if acct.role = 'student' then
+    return exists (
+      select 1
+      from students s
+      join org_units p on p.id = s.program_id
+      where s.id = acct.student_id
+        and (p.id = p_id or p.parent_id = p_id)
+    );
+  end if;
+
+  return false;
 end;
 $$;
 
@@ -852,11 +947,11 @@ alter table transcript_entries enable row level security;
 
 drop policy if exists org_units_read on org_units;
 create policy org_units_read on org_units
-  for select using ((current_app_account()).id is not null);
+  for select using (org_unit_is_visible(id));
 
 drop policy if exists institution_settings_read on institution_settings;
 create policy institution_settings_read on institution_settings
-  for select using ((current_app_account()).id is not null);
+  for select using (org_unit_is_visible(org_unit_id));
 
 drop policy if exists academic_years_read on academic_years;
 create policy academic_years_read on academic_years
@@ -869,16 +964,41 @@ create policy terms_read on terms
 drop policy if exists people_read on people;
 create policy people_read on people
   for select using (
-    (current_app_account()).id is not null
-    and (
+    id = (current_app_account()).person_id
+    or (
       (current_app_account()).role <> 'student'
-      or (current_app_account()).person_id = people.id
+      and (
+        exists (
+          select 1 from students s
+          where s.person_id = people.id and student_is_visible(s.id)
+        )
+        or exists (
+          select 1 from staff st
+          where st.person_id = people.id
+            and (
+              st.person_id = (current_app_account()).person_id
+              or org_unit_is_visible(st.org_unit_id)
+            )
+        )
+        or exists (
+          select 1
+          from course_offerings o
+          where o.instructor_id = people.id
+            and course_is_visible(o.course_id)
+        )
+      )
     )
   );
 
 drop policy if exists staff_read on staff;
 create policy staff_read on staff
-  for select using ((current_app_account()).role <> 'student');
+  for select using (
+    (current_app_account()).role <> 'student'
+    and (
+      person_id = (current_app_account()).person_id
+      or org_unit_is_visible(org_unit_id)
+    )
+  );
 
 drop policy if exists students_read on students;
 create policy students_read on students
@@ -970,14 +1090,15 @@ create policy transcript_entries_read on transcript_entries
   );
 
 comment on table org_units is 'University → sector → program tree. scope_id on user_accounts points here. Analytics "college" = program-level row.';
-comment on table courses is 'Catalog curriculum. counted_in_cumulative_gpa / pass_fail_subject drive GPA eligibility.';
+comment on table courses is 'Catalog curriculum. requirement_level_type is college|university. counted_in_cumulative_gpa / pass_fail_subject drive GPA eligibility and must not be inferred from year_level or course ids.';
 comment on table enrollments is 'A student may sit an exam only through an enrollment on that offering.';
 comment on table exam_attempts is 'Roster row per enrollment × exam; status=absent means no sitting.';
 comment on table transcript_entries is 'Closed academic-year grades when live exam rows are not kept.';
 comment on column exams.is_synthetic is 'True for generated demo assessment rows; false for imported university records.';
-comment on function current_app_account() is 'Reads app.current_user_id (user_accounts.id). Set in the API session.';
+comment on function current_app_account() is 'Reads app.current_user_id (user_accounts.id). Password hash is never returned. Set in the API session.';
 comment on function student_is_visible(text) is 'Whether the session role may see this student row.';
 comment on function course_is_visible(text) is 'Whether the session role may see this course row.';
+comment on function org_unit_is_visible(text) is 'Whether the session role may see this org_units row.';
 
 -- ---------------------------------------------------------------------------
 -- Login + class-average helpers (SECURITY DEFINER, RLS off)
@@ -1018,12 +1139,23 @@ as $$
   where a.exam_id = any(exam_ids)
     and a.status <> 'absent'
     and a.score is not null
+    and (
+      exam_is_visible(a.exam_id)
+      or exists (
+        select 1
+        from exam_attempts mine
+        where mine.exam_id = a.exam_id
+          and mine.student_id = (current_app_account()).student_id
+      )
+    )
   group by a.exam_id;
 $$;
 
 -- ---------------------------------------------------------------------------
 -- Application role, FORCE RLS, grants
--- The login role password is NOT stored here. Operators set it out of band:
+-- app_user is the recommended least-privilege LOGIN role. This script does
+-- not set a password. Operators set it out of band, then point DATABASE_URL
+-- at that role. The API never rewrites DATABASE_URL usernames.
 --   ALTER ROLE app_user LOGIN PASSWORD '...';
 -- ---------------------------------------------------------------------------
 
@@ -1062,6 +1194,7 @@ alter table transcript_entries force row level security;
 revoke all on function org_descendants(text) from public;
 revoke all on function current_app_account() from public;
 revoke all on function current_visible_program_ids() from public;
+revoke all on function org_unit_is_visible(text) from public;
 revoke all on function current_professor_course_ids() from public;
 revoke all on function current_student_course_ids() from public;
 revoke all on function student_is_visible(text) from public;
@@ -1077,6 +1210,7 @@ revoke all on function get_exam_averages(text[]) from public;
 grant execute on function org_descendants(text) to app_user;
 grant execute on function current_app_account() to app_user;
 grant execute on function current_visible_program_ids() to app_user;
+grant execute on function org_unit_is_visible(text) to app_user;
 grant execute on function current_professor_course_ids() to app_user;
 grant execute on function current_student_course_ids() to app_user;
 grant execute on function student_is_visible(text) to app_user;
@@ -1088,5 +1222,11 @@ grant execute on function attempt_is_visible(text) to app_user;
 grant execute on function exam_class_average(text) to app_user;
 grant execute on function get_user_for_login(text) to app_user;
 grant execute on function get_exam_averages(text[]) to app_user;
+
+create table if not exists public.schema_migrations (
+  version text primary key,
+  filename text not null,
+  applied_at timestamptz not null default now()
+);
 
 commit;

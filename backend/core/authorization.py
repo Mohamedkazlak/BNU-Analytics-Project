@@ -91,5 +91,5 @@ def assert_filters_in_scope(scope: AuthScope, filters: AnalyticsFilters, require
             raise HTTPException(status_code=403, detail="Sector filter is outside your authorized program")
 
     if role == "professor":
-        if filters.curriculum_id and scope.course_ids and filters.curriculum_id not in scope.course_ids:
+        if filters.curriculum_id and filters.curriculum_id not in scope.course_ids:
             raise HTTPException(status_code=403, detail="Curriculum is not in your assigned teaching scope")

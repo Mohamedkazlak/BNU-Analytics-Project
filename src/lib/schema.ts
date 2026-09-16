@@ -72,6 +72,9 @@ export interface CourseRow {
   name: string;
   credits: number;
   yearLevel: number;
+  requirementLevelType?: "college" | "university";
+  countedInCumulativeGpa?: boolean;
+  passFailSubject?: boolean;
 }
 
 export interface CourseOfferingRow {

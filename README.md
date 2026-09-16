@@ -78,11 +78,18 @@ Interactive API documentation is at `/docs`.
 
 ### Database
 
+Copy `.env.example`. Do not commit secrets.
+
+The API uses `DATABASE_URL` as supplied. In production that role must **not**
+bypass row-level security (do not use Supabase `postgres` for the app). Create
+`app_user`, set its password out of band, and point `DATABASE_URL` at it.
+Migrations that need DDL can use `DATABASE_ADMIN_URL`.
+
 Fresh install:
 
 ```sh
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/schema.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/seed.sql
+psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -f db/schema.sql
+psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -f db/seed.sql
 ```
 
 Existing database:
@@ -91,7 +98,9 @@ Existing database:
 python backend/run_migration.py
 ```
 
-`DATABASE_URL` is required. Do not commit credentials.
+The runner records versions in `schema_migrations` and will not re-apply a
+file. `DATABASE_URL` / `DATABASE_ADMIN_URL` are required. Do not commit
+credentials.
 
 ## Tests
 
@@ -106,7 +115,12 @@ CI runs the same commands in `.github/workflows/ci.yml` without production secre
 
 ## Data model
 
-Organizational scope, people/students, curriculum metadata (including GPA eligibility and pass/fail), offerings, enrollments, exams, questions, attempts, answers, integrity events, and transcript records live in PostgreSQL. Assessment rows can be marked `is_synthetic` so demo activity is distinguishable from imported university records.
+Organizational scope, people/students, curriculum metadata (`college` /
+`university` requirement level, GPA eligibility, pass/fail), offerings,
+enrollments, exams, questions, attempts, answers, integrity events, and
+transcript records live in PostgreSQL. Assessment rows can be marked
+`is_synthetic` so demo activity is distinguishable from imported university
+records. The UI shows a notice when a scope contains synthetic assessments.
 
 **Important:** synthetic assessment results are demonstration data and must never be represented as official university grades.
 
@@ -114,4 +128,4 @@ GPA is computed on the backend (`backend/services/gpa.py`) using a documented 4.
 
 ## Project status
 
-This is a portfolio/prototype analytics system rather than an official university production system. Remaining production work includes secret management in hosted environments, applying migrations on the live Supabase project, confirming RLS policies after schema changes, multi-instance caching if you scale past one API process, observability, and rate limiting.
+This is a portfolio/prototype analytics system rather than an official university production system. Remaining production work includes secret management in hosted environments, pointing the live API at a non-BYPASSRLS database role, multi-instance caching if you scale past one API process, observability, and rate limiting.

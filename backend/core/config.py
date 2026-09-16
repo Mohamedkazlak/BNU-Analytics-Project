@@ -7,6 +7,7 @@ class Settings(BaseModel):
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", "postgresql://app_user:change-me@localhost:5432/postgres"
     )
+    DATABASE_ADMIN_URL: str = os.getenv("DATABASE_ADMIN_URL", "")
     JWT_SECRET: str = os.getenv("JWT_SECRET", "")
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = int(os.getenv("JWT_EXPIRY_MINUTES", "480"))

@@ -152,6 +152,7 @@ export interface ManagementOverview {
   }[];
   activityTrend: { month: string; exams: number; participants: number }[];
   insight: string;
+  containsSynthetic?: boolean;
 }
 
 export interface RankedStudent {

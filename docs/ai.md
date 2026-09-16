@@ -20,11 +20,23 @@ One backend orchestration (`get_ai_decision`) loads `load_ai_context` once
 for the authenticated role and current filters, then derives:
 
 - insight
-- current standing (or a genuine forecast only if history exists)
+- current standing
 - structured recommendations with “Based on” evidence
 
 The previous three parallel endpoints (`/api/insights`, `/api/predictions`,
 `/api/recommendations`) still exist but each now reuses the combined path.
+
+```text
+POST /api/ai/decision
+        ↓
+validate filters
+        ↓
+load one filtered context
+        ↓
+insight + current standing + recommendations
+        ↓
+cache
+```
 
 ## Why the old path timed out
 
@@ -46,21 +58,27 @@ Do not “fix” remaining slowness by raising those timeouts.
 
 ## Current standing vs prediction
 
-Exam offerings in this database are current-term. Until multi-term exam
-history exists, the UI label is **Current standing**, `kind` is
+Exam offerings in this database are current-term. Until a forecasting model
+is wired, the UI label is **Current standing**, `kind` is
 `current_standing`, and the copy states that the numbers are not a forecast.
+Year counts used in that copy come from the selected analytics scope (filters
+and RLS), not from global `course_offerings` history.
+
 `backend/services/predictions.py` is the extension point for a later
 model that would use multi-term scores, attendance and course history. No LLM
-is used for numerical prediction.
+is used for numerical prediction. The JSON field remains named `prediction`
+for compatibility; it is current standing.
 
 ## Filters
 
-AI uses the same `AnalyticsFilters` as the dashboard. Cache keys and React
-Query keys include those filters plus the authenticated user.
+AI uses the same `AnalyticsFilters` as the dashboard. Cache keys include the
+authenticated user, role, scope, filters, academic year, term and data
+version. The cache is not a security boundary.
 
 ## Limitations
 
 - Template text, not generative AI.
-- In-process cache only (single instance).
+- In-process cache only (single instance, bounded eviction).
 - Integrity “risk scores” are fused from recorded signals, not a trained model.
-- CI tests mock repositories; they do not measure production latency.
+- Unit tests mock repositories; CI integration tests cover schema/RLS, not
+  production LLM latency (there is no LLM).

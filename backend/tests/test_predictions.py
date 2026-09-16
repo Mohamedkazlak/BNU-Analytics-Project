@@ -1,4 +1,11 @@
-from services.predictions import current_standing_from_context
+import asyncio
+from unittest.mock import AsyncMock
+
+from schemas.filters import AnalyticsFilters
+from services.predictions import (
+    _scoped_offering_year_count,
+    current_standing_from_context,
+)
 
 
 def test_management_output_is_current_standing_not_a_forecast():
@@ -20,3 +27,19 @@ def test_management_output_is_current_standing_not_a_forecast():
 
 def test_empty_scope_returns_nothing_rather_than_inventing_numbers():
     assert current_standing_from_context("senior_management", {"overview": {}}) is None
+
+
+def test_offering_year_count_is_scoped_not_global():
+    async def run():
+        db = AsyncMock()
+        db.fetchval = AsyncMock(return_value=1)
+        filters = AnalyticsFilters(sector_id="sec-a", college_id="col-a")
+        count = await _scoped_offering_year_count(db, filters)
+        assert count == 1
+        sql = db.fetchval.await_args.args[0]
+        assert "parent_id" in sql
+        assert "program_id" in sql
+        assert db.fetchval.await_args.args[1:] == ("sec-a", "col-a")
+        assert "FROM course_offerings" in sql.replace("\n", " ")
+
+    asyncio.run(run())

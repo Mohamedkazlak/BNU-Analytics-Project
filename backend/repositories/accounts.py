@@ -210,7 +210,7 @@ async def _assert_hierarchy(
             raise HTTPException(status_code=403, detail="Curriculum is not accessible")
         if filters.college_id and row["program_id"] != filters.college_id:
             raise HTTPException(status_code=400, detail="Curriculum does not belong to the selected college")
-        if scope.role == "professor" and scope.course_ids and row["id"] not in scope.course_ids:
+        if scope.role == "professor" and row["id"] not in scope.course_ids:
             raise HTTPException(status_code=403, detail="Curriculum is not in your assigned teaching scope")
 
     if filters.student_id:

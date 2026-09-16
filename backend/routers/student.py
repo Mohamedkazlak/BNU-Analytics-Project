@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api", tags=["student"])
 
 @router.get("/student-dashboard", response_model=StudentDashboardReport)
 async def route_get_student_dashboard(
+    studentId: str | None = None,
     ctx: UserContext = Depends(require_role("student")),
     db: asyncpg.Connection = Depends(get_db_conn),
 ):
@@ -19,15 +20,20 @@ async def route_get_student_dashboard(
         row = await db.fetchrow("SELECT student_id FROM user_accounts WHERE id = $1", ctx.user_id)
         if row:
             ctx.student_id = row["student_id"]
+    if studentId and ctx.student_id and studentId != ctx.student_id:
+        raise HTTPException(status_code=403, detail="Students may only query their own record")
     return await get_student_dashboard(ctx, db)
 
 @router.get("/students/{student_id}", response_model=StudentProfileReport)
 async def route_get_student_profile(
     student_id: str,
-    ctx: UserContext = Depends(require_role("senior_management", "program_director", "academic_affairs", "professor")),
+    ctx: UserContext = Depends(require_role("senior_management", "program_director", "academic_affairs", "professor", "student")),
     db: asyncpg.Connection = Depends(get_db_conn),
     filters: AnalyticsFilters = Depends(get_partial_filters),
 ):
+    if ctx.role == "student":
+        if not ctx.student_id or student_id != ctx.student_id:
+            raise HTTPException(status_code=403, detail="Students may only query their own record")
     scoped = AnalyticsFilters(
         sector_id=filters.sector_id,
         college_id=filters.college_id,

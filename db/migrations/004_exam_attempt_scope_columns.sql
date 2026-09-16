@@ -3,7 +3,8 @@
 
 begin;
 
-create or replace view v_exam_attempts
+drop view if exists v_exam_attempts;
+create view v_exam_attempts
   with (security_invoker = true)
 as
 select
@@ -36,5 +37,12 @@ join org_units sec on sec.id = p.parent_id
 join exams x on x.id = a.exam_id
 join course_offerings o on o.id = x.offering_id
 join courses c on c.id = o.course_id;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'app_user') then
+    grant select on v_exam_attempts to app_user;
+  end if;
+end $$;
 
 commit;

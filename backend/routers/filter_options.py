@@ -15,5 +15,6 @@ async def route_filter_options(
     ctx: UserContext = Depends(get_live_user),
     db: asyncpg.Connection = Depends(get_db_conn),
     filters: AnalyticsFilters = Depends(get_partial_filters),
+    q: str | None = None,
 ):
-    return await get_filter_options(ctx, db, filters)
+    return await get_filter_options(ctx, db, filters, q=q)

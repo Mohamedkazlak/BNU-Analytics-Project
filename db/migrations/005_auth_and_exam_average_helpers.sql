@@ -42,6 +42,15 @@ as $$
   where a.exam_id = any(exam_ids)
     and a.status <> 'absent'
     and a.score is not null
+    and (
+      exam_is_visible(a.exam_id)
+      or exists (
+        select 1
+        from exam_attempts mine
+        where mine.exam_id = a.exam_id
+          and mine.student_id = (current_app_account()).student_id
+      )
+    )
   group by a.exam_id;
 $$;
 
@@ -80,5 +89,9 @@ revoke all on function get_user_for_login(text) from public;
 revoke all on function get_exam_averages(text[]) from public;
 grant execute on function get_user_for_login(text) to app_user;
 grant execute on function get_exam_averages(text[]) to app_user;
+
+-- app_user is created without a password. Do not point DATABASE_URL at it
+-- until an operator has set a password out of band. The API uses DATABASE_URL
+-- as supplied and does not rewrite the username to app_user.
 
 commit;

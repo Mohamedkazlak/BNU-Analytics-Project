@@ -34,6 +34,9 @@ export interface FilterOptionsResponse {
   colleges: FilterOption[];
   curricula: CurriculumOption[];
   students: StudentOption[];
+  hasMoreStudents?: boolean;
+  studentPageSize?: number;
+  containsSynthetic?: boolean;
 }
 
 export function toSearchParams(filters: AnalyticsFilters): string {

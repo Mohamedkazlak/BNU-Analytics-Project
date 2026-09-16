@@ -64,6 +64,12 @@ class GpaResult(BaseModel):
 
 
 def compute_gpa(entries: list[TranscriptCourse]) -> GpaResult:
+    """Cumulative GPA from course metadata flags only.
+
+    A row contributes when counted_in_cumulative_gpa is true and
+    pass_fail_subject is false. Eligibility is never inferred from year
+    level, course code, course name, requirement level, or course ids.
+    """
     quality_points = 0.0
     gpa_credits = 0
     excluded_pf = 0

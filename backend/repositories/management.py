@@ -137,10 +137,25 @@ async def get_management_overview(
             f"{strongest['passRate']}%."
         )
 
+    contains_synthetic = bool(
+        await db.fetchval(
+            f"""
+            SELECT EXISTS (
+              SELECT 1
+              FROM v_exam_attempts a
+              JOIN exams x ON x.id = a.exam_id
+              WHERE ({where_sql}) AND x.is_synthetic
+            )
+            """,
+            *args,
+        )
+    )
+
     return {
         "kpis": kpis,
         "passRateByCourse": pass_rate_by_course,
         "passRateByCollege": pass_rate_by_college,
         "activityTrend": timeline,
         "insight": insight,
+        "containsSynthetic": contains_synthetic,
     }

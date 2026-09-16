@@ -151,9 +151,14 @@ export function getStudentProfile(
   );
 }
 
-export function getFilterOptions(filters: AnalyticsFilters = {}) {
+export function getFilterOptions(filters: AnalyticsFilters = {}, q?: string) {
+  const params = new URLSearchParams(
+    toSearchParams(filters).replace(/^\?/, ""),
+  );
+  if (q) params.set("q", q);
+  const query = params.toString();
   return fetchFromBackend<FilterOptionsResponse>(
-    `/api/filter-options${toSearchParams(filters)}`,
+    `/api/filter-options${query ? `?${query}` : ""}`,
   );
 }
 

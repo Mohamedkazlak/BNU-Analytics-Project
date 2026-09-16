@@ -495,22 +495,10 @@ join academic_years y on y.is_current = false
 join courses c on c.program_id = st.program_id
   and c.year_level = case y.id when '2023/24' then 1 else 2 end;
 
--- Pass/fail studio elective: excluded from cumulative GPA.
-update courses
-set
-  requirement_level_type = case
-    when year_level = 1 then 'university_requirement'::requirement_level_type
-    else 'program_core'::requirement_level_type
-  end,
-  counted_in_cumulative_gpa = true,
-  pass_fail_subject = false;
-
-update courses
-set
-  pass_fail_subject = true,
-  counted_in_cumulative_gpa = false,
-  requirement_level_type = 'elective'
-where id = 'c-art-110';
+-- Catalog rows keep conservative curriculum defaults from schema.sql:
+-- requirement_level_type = 'college', counted_in_cumulative_gpa = true,
+-- pass_fail_subject = false. Do not invent classifications from year_level
+-- or hard-code a demo course as pass/fail.
 
 insert into attempt_answers (attempt_id, question_id, is_correct, points, is_synthetic)
 select

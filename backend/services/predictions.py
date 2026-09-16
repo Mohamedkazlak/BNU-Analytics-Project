@@ -3,6 +3,8 @@
 Exam offerings in this database are current-term only, so a numerical forecast
 is not computed. When two or more academic years of transcript data exist for
 the selected student, direction is taken from that real history. No LLM is used.
+Year counts are always taken from the authorized / selected scope, never from
+global university history.
 """
 
 from __future__ import annotations
@@ -126,22 +128,64 @@ def current_standing_from_context(role: str, ctx_data: dict[str, Any]) -> Option
     return None
 
 
+async def _scoped_offering_year_count(
+    db: asyncpg.Connection,
+    filters: AnalyticsFilters,
+) -> int:
+    clauses = ["TRUE"]
+    args: list = []
+    i = 1
+    if filters.sector_id:
+        clauses.append(f"p.parent_id = ${i}")
+        args.append(filters.sector_id)
+        i += 1
+    if filters.college_id:
+        clauses.append(f"c.program_id = ${i}")
+        args.append(filters.college_id)
+        i += 1
+    if filters.curriculum_id:
+        clauses.append(f"c.id = ${i}")
+        args.append(filters.curriculum_id)
+        i += 1
+    if filters.student_id:
+        clauses.append(
+            f"""EXISTS (
+                SELECT 1 FROM enrollments e
+                WHERE e.offering_id = o.id AND e.student_id = ${i}
+            )"""
+        )
+        args.append(filters.student_id)
+        i += 1
+    where_sql = " AND ".join(clauses)
+    return int(
+        await db.fetchval(
+            f"""
+            SELECT COUNT(DISTINCT o.academic_year_id)
+            FROM course_offerings o
+            JOIN courses c ON c.id = o.course_id
+            JOIN org_units p ON p.id = c.program_id
+            WHERE {where_sql}
+            """,
+            *args,
+        )
+        or 0
+    )
+
+
 async def get_standing_or_forecast(
     ctx: UserContext,
     db: asyncpg.Connection,
     filters: AnalyticsFilters,
     ctx_data: dict[str, Any],
 ) -> Optional[dict]:
-    years = await db.fetchval(
-        "SELECT COUNT(DISTINCT academic_year_id) FROM course_offerings"
-    )
+    years = await _scoped_offering_year_count(db, filters)
     result = current_standing_from_context(ctx.role, ctx_data)
     if result is None:
         return None
-    if years and years >= 2:
+    if years >= 2:
         result["summary"] = (
-            "Multiple offering years exist, but a forecasting model is not wired. "
-            "Showing current-term standing from recorded attempts."
+            "Multiple offering years exist in this scope, but a forecasting "
+            "model is not wired. Showing current-term standing from recorded attempts."
         )
     if filters.student_id:
         year_avgs = await db.fetch(

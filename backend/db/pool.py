@@ -1,44 +1,42 @@
-from urllib.parse import urlparse, urlunparse
-
 import asyncpg
 from fastapi import Request
 
 from core.config import settings
 
 
-def get_app_user_db_url(url: str) -> str:
-    """Replace the database username with the configured application user.
-
-    The password is intentionally not embedded in source code. For Supabase
-    pooler URLs, the project reference is retained in the username format.
-    """
-    parsed = urlparse(url)
-    if parsed.scheme not in ("postgres", "postgresql"):
-        return url
-
-    original_user = parsed.username
-    new_user = "app_user"
-    if original_user and "." in original_user:
-        project_ref = original_user.split(".", 1)[1]
-        new_user = f"app_user.{project_ref}"
-
-    # Preserve the configured password from DATABASE_URL.
-    password = parsed.password or ""
-    host = parsed.hostname or "localhost"
-    netloc = f"{new_user}:{password}@{host}"
-    if parsed.port:
-        netloc += f":{parsed.port}"
-    return urlunparse(parsed._replace(netloc=netloc))
+async def _assert_rls_role(connection: asyncpg.Connection) -> None:
+    """Refuse a production connection that would silently bypass RLS."""
+    bypass = await connection.fetchval(
+        """
+        SELECT rolbypassrls OR rolsuper
+        FROM pg_roles
+        WHERE rolname = current_user
+        """
+    )
+    if not bypass:
+        return
+    message = (
+        "DATABASE_URL is connected as a role that bypasses row-level security "
+        f"(current_user={await connection.fetchval('select current_user')}). "
+        "Point DATABASE_URL at a non-BYPASSRLS role such as app_user. "
+        "Do not store that password in git; set it out of band with ALTER ROLE."
+    )
+    if settings.APP_ENV == "production":
+        raise RuntimeError(message)
+    print(f"WARNING: {message}")
 
 
 async def create_pool():
-    return await asyncpg.create_pool(
-        get_app_user_db_url(settings.DATABASE_URL),
+    pool = await asyncpg.create_pool(
+        settings.DATABASE_URL,
         min_size=1,
         max_size=10,
         command_timeout=20,
         server_settings={"statement_timeout": "15000"},
     )
+    async with pool.acquire() as connection:
+        await _assert_rls_role(connection)
+    return pool
 
 
 async def get_db_conn(request: Request):

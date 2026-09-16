@@ -1,14 +1,12 @@
 import asyncpg
 
 from core.utils import round1
-from schemas.filters import AnalyticsFilters
 from services.gpa import (
     TranscriptCourse,
     compute_gpa,
     letter_from_percent,
     standing_from_gpa,
 )
-import asyncpg
 
 
 async def build_profile_years(db: asyncpg.Connection, student_id: str) -> dict:

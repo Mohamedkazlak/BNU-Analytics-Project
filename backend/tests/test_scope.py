@@ -114,6 +114,18 @@ def test_student_cannot_query_another_student():
     assert exc.value.status_code == 403
 
 
+def test_professor_without_assignments_cannot_query_any_curriculum():
+    scope = make_scope(
+        role="professor",
+        scope_id=None,
+        scope_level=None,
+        course_ids=[],
+    )
+    with pytest.raises(HTTPException) as exc:
+        assert_filters_in_scope(scope, AnalyticsFilters(curriculum_id="c1"))
+    assert exc.value.status_code == 403
+
+
 def test_filters_cannot_expand_program_director_scope():
     scope = make_scope(
         role="program_director",

@@ -27,6 +27,8 @@ interface AnalyticsFilterContextValue {
   setCollegeId: (id: string) => void;
   setCurriculumId: (id: string) => void;
   setStudentId: (id: string) => void;
+  studentQuery: string;
+  setStudentQuery: (q: string) => void;
   clear: () => void;
   filtersReady: boolean;
 }
@@ -58,10 +60,20 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState<AnalyticsFilters>(() =>
     readStored(user.id),
   );
+  const [studentQuery, setStudentQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
   useEffect(() => {
     setFilters(readStored(user.id));
   }, [user.id]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(
+      () => setDebouncedQuery(studentQuery.trim()),
+      250,
+    );
+    return () => window.clearTimeout(handle);
+  }, [studentQuery]);
 
   const persist = useCallback(
     (next: AnalyticsFilters) => {
@@ -78,8 +90,9 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
       filters.sectorId ?? null,
       filters.collegeId ?? null,
       filters.curriculumId ?? null,
+      debouncedQuery,
     ],
-    queryFn: () => getFilterOptions(filters),
+    queryFn: () => getFilterOptions(filters, debouncedQuery || undefined),
     enabled: Boolean(user.id) && role !== "student",
   });
   const options = optionsQuery.data;
@@ -131,6 +144,8 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
       setCollegeId,
       setCurriculumId,
       setStudentId,
+      studentQuery,
+      setStudentQuery,
       clear,
       filtersReady,
     }),
@@ -141,6 +156,8 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
       setCollegeId,
       setCurriculumId,
       setStudentId,
+      studentQuery,
+      setStudentQuery,
       clear,
       filtersReady,
     ],

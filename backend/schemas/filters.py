@@ -62,6 +62,9 @@ class FilterOptionsResponse(BaseModel):
     colleges: List[FilterOption]
     curricula: List[CurriculumOption]
     students: List[StudentOption]
+    hasMoreStudents: bool = False
+    studentPageSize: int = 150
+    containsSynthetic: bool = False
 
 
 class AiDecisionRequest(BaseModel):
