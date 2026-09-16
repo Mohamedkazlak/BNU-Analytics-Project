@@ -1,15 +1,12 @@
 /**
  * Row shapes for the PostgreSQL schema in `db/schema.sql`.
  * Dashboards still consume the denormalized view types in `types.ts`;
- * those views are projected from these tables in `mock-data.ts`.
+ * those views are projected from PostgreSQL via FastAPI.
  */
 import type { AttemptStatus, ExamStatus, Role, ScopeLevel } from "./types";
 
 export type AcademicStanding =
-  | "Excellent"
-  | "Good standing"
-  | "Watch list"
-  | "At risk";
+  "Excellent" | "Good standing" | "Watch list" | "At risk";
 
 export interface OrgUnitRow {
   id: string;
