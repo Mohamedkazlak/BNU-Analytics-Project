@@ -59,3 +59,18 @@ def test_migration_008_revokes_explicit_anon_execute():
     assert "authenticated" in migration
     assert "get_user_for_login" in migration
     assert "from pg_roles" in migration
+
+
+def test_migration_010_only_backfills_unmarked_syn_transc_rows():
+    migration = (
+        ROOT / "db" / "migrations" / "010_syn_transc_marker_backfill.sql"
+    ).read_text()
+    assert "update transcript_entries" in migration
+    assert "set is_synthetic = true" in migration
+    assert "id like 'syn-transc%'" in migration
+    assert "is_synthetic = false" in migration
+    lowered = migration.lower()
+    assert "alter table" not in lowered
+    assert "create " not in lowered
+    assert "insert " not in lowered
+    assert "delete " not in lowered

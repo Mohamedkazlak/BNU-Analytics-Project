@@ -251,6 +251,7 @@ def test_migrated_schema_matches_fresh_curriculum_and_org_policy(fresh_db, migra
         "007",
         "008",
         "009",
+        "010",
     ]
     sector_col = asyncio.run(
         _fetch(
@@ -287,6 +288,9 @@ def test_migration_runner_skips_already_applied(migrated_db):
     )
     assert (
         "skip 009_disable_schema_migrations_rls.sql (already applied)" in runner.stdout
+    )
+    assert (
+        "skip 010_syn_transc_marker_backfill.sql (already applied)" in runner.stdout
     )
     assert not any(line.startswith("applied ") for line in runner.stdout.splitlines())
 
@@ -506,6 +510,132 @@ def test_migration_006_backfills_only_synthetic_attempts_after_003():
         )
     )
     assert marked[0]["is_synthetic"] is True
+
+
+def test_migration_010_backfills_unmarked_syn_transc_via_runner():
+    _require_admin()
+    dbname = "bnu_analytics_ci_syn010"
+    _recreate(dbname)
+    url = _db_url(dbname)
+    setup = _psql(
+        url,
+        sql="""
+        CREATE TABLE transcript_entries (
+          id text PRIMARY KEY,
+          is_synthetic boolean NOT NULL DEFAULT false
+        );
+        INSERT INTO transcript_entries (id, is_synthetic) VALUES
+          ('syn-transc-needs-backfill', false),
+          ('syn-transc-already-true', true),
+          ('tr-s1-c1', false),
+          ('imported-transc-99', false);
+
+        CREATE TABLE public.schema_migrations (
+          version text PRIMARY KEY,
+          filename text NOT NULL,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        );
+        INSERT INTO public.schema_migrations (version, filename) VALUES
+          ('001', '001_curriculum_metadata.sql'),
+          ('002', '002_performance_indexes.sql'),
+          ('003', '003_synthetic-data-markers.sql'),
+          ('004', '004_exam_attempt_scope_columns.sql'),
+          ('005', '005_auth_and_exam_average_helpers.sql'),
+          ('006', '006_synthetic_item_answers.sql'),
+          ('007', '007_org_unit_rls_and_helpers.sql'),
+          ('008', '008_revoke_anon_execute_on_helpers.sql'),
+          ('009', '009_disable_schema_migrations_rls.sql');
+        """,
+    )
+    if setup.returncode != 0:
+        pytest.fail(setup.stderr)
+
+    before = asyncio.run(
+        _fetch(
+            url,
+            """
+            SELECT id, is_synthetic, xmin::text AS xmin
+            FROM transcript_entries
+            """,
+        )
+    )
+    before_map = {r["id"]: r for r in before}
+
+    from run_migration import DEFAULT_MIGRATIONS_DIR, apply_migrations
+
+    log = asyncio.run(apply_migrations(url, DEFAULT_MIGRATIONS_DIR))
+    assert "applied 010_syn_transc_marker_backfill.sql" in log
+    assert "skip 003_synthetic-data-markers.sql (already applied)" in log
+    assert not any(
+        line.startswith("applied ") and "010_" not in line for line in log
+    )
+
+    after = asyncio.run(
+        _fetch(
+            url,
+            """
+            SELECT id, is_synthetic, xmin::text AS xmin
+            FROM transcript_entries
+            """,
+        )
+    )
+    after_map = {r["id"]: r for r in after}
+    assert after_map["syn-transc-needs-backfill"]["is_synthetic"] is True
+    assert (
+        after_map["syn-transc-needs-backfill"]["xmin"]
+        != before_map["syn-transc-needs-backfill"]["xmin"]
+    )
+    assert after_map["syn-transc-already-true"]["is_synthetic"] is True
+    assert (
+        after_map["syn-transc-already-true"]["xmin"]
+        == before_map["syn-transc-already-true"]["xmin"]
+    )
+    assert after_map["tr-s1-c1"]["is_synthetic"] is False
+    assert after_map["tr-s1-c1"]["xmin"] == before_map["tr-s1-c1"]["xmin"]
+    assert after_map["imported-transc-99"]["is_synthetic"] is False
+    assert (
+        after_map["imported-transc-99"]["xmin"]
+        == before_map["imported-transc-99"]["xmin"]
+    )
+
+    recorded = asyncio.run(
+        _fetch(
+            url,
+            "SELECT version, filename FROM public.schema_migrations ORDER BY version",
+        )
+    )
+    assert [r["version"] for r in recorded] == [
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+        "006",
+        "007",
+        "008",
+        "009",
+        "010",
+    ]
+    assert recorded[-1]["filename"] == "010_syn_transc_marker_backfill.sql"
+
+    _apply_file(url, ROOT / "db" / "migrations" / "010_syn_transc_marker_backfill.sql")
+    reapplied = asyncio.run(
+        _fetch(
+            url,
+            """
+            SELECT id, is_synthetic, xmin::text AS xmin
+            FROM transcript_entries
+            """,
+        )
+    )
+    reapplied_map = {r["id"]: r for r in reapplied}
+    for row_id, row in after_map.items():
+        assert reapplied_map[row_id]["is_synthetic"] == row["is_synthetic"]
+        assert reapplied_map[row_id]["xmin"] == row["xmin"]
+
+    second = asyncio.run(apply_migrations(url, DEFAULT_MIGRATIONS_DIR))
+    assert "skip 010_syn_transc_marker_backfill.sql (already applied)" in second
+    assert not any(line.startswith("applied ") for line in second)
 
 
 def test_rls_student_cannot_see_other_students(fresh_db):

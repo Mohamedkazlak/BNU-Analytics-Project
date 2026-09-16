@@ -65,4 +65,15 @@ def test_repo_migrations_have_unique_padded_versions():
     from run_migration import DEFAULT_MIGRATIONS_DIR
 
     versions = [version for version, _ in collect_migrations(DEFAULT_MIGRATIONS_DIR)]
-    assert versions == ["001", "002", "003", "004", "005", "006", "007", "008", "009"]
+    assert versions == [
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+        "006",
+        "007",
+        "008",
+        "009",
+        "010",
+    ]
