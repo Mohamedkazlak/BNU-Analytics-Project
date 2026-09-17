@@ -58,7 +58,10 @@ call `SECURITY DEFINER` helpers (`search_path = public`, `row_security = off`)
 so FORCE RLS cannot recurse. Helpers revoke PUBLIC execute and grant execute
 to `app_user` only. `current_app_account()` never returns `password_hash`.
 
-`org_units` is scoped by `org_unit_is_visible()` — not “any authenticated
+SELECT policies use uncorrelated `id IN (SELECT current_visible_*_ids())`
+so PostgreSQL can InitPlan authorization once per statement. Boolean
+helpers remain for SQL/RPC callers and wrap those sets. `org_units` is
+scoped by `current_visible_org_unit_ids()` — not “any authenticated
 account.” People and staff rows are limited to the caller’s own person,
 visible students, and staff/instructors in visible org units or courses.
 

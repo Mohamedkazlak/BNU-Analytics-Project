@@ -93,6 +93,7 @@ end $$;
 create or replace function set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -274,6 +275,7 @@ create table if not exists course_offerings (
 create index if not exists course_offerings_course_id_idx on course_offerings (course_id);
 create index if not exists course_offerings_instructor_id_idx on course_offerings (instructor_id);
 create index if not exists course_offerings_term_id_idx on course_offerings (term_id);
+create index if not exists course_offerings_academic_year_id_idx on course_offerings (academic_year_id);
 
 create table if not exists course_sections (
   id text primary key,
@@ -299,7 +301,8 @@ create table if not exists enrollments (
   offering_id text not null references course_offerings (id) on delete cascade,
   section_id text not null references course_sections (id) on delete restrict,
   enrolled_at timestamptz not null default now(),
-  unique (student_id, offering_id)
+  unique (student_id, offering_id),
+  constraint enrollments_id_student_id_key unique (id, student_id)
 );
 
 create index if not exists enrollments_offering_id_idx on enrollments (offering_id);
@@ -362,7 +365,10 @@ create table if not exists exam_attempts (
   constraint exam_attempts_absent_score check (
     (status = 'absent' and score is null)
     or (status <> 'absent')
-  )
+  ),
+  constraint exam_attempts_enrollment_student_fk
+    foreign key (enrollment_id, student_id)
+    references enrollments (id, student_id)
 );
 
 create index if not exists exam_attempts_exam_id_idx on exam_attempts (exam_id);
@@ -411,6 +417,7 @@ create table if not exists transcript_entries (
 create index if not exists transcript_entries_student_id_idx on transcript_entries (student_id);
 create index if not exists transcript_entries_academic_year_id_idx
   on transcript_entries (academic_year_id);
+create index if not exists transcript_entries_course_id_idx on transcript_entries (course_id);
 
 -- ---------------------------------------------------------------------------
 -- Views (security_invoker so RLS on base tables still applies)
@@ -610,94 +617,116 @@ begin
 end;
 $$;
 
-create or replace function org_unit_is_visible(p_id text)
-returns boolean
-language plpgsql
+create or replace function current_visible_org_unit_ids()
+returns setof text
+language sql
 stable
 security definer
 set search_path = public
 set row_security = off
 as $$
-declare
-  acct user_accounts;
-  node org_units;
-  target org_units;
-begin
-  acct := current_app_account();
-  if acct is null or p_id is null then
-    return false;
-  end if;
+  with acct as (
+    select * from current_app_account()
+  )
+  select u.id
+  from org_units u, acct
+  where acct.id is not null
+    and u.level = 'university'
 
-  select * into target from org_units where id = p_id;
-  if not found then
-    return false;
-  end if;
+  union
 
-  -- University root is needed for labels / filter ancestry by every role.
-  if target.level = 'university' then
-    return true;
-  end if;
+  select acct.scope_id
+  from acct
+  where acct.id is not null
+    and acct.scope_id is not null
 
-  if acct.scope_id is not null and p_id = acct.scope_id then
-    return true;
-  end if;
+  union
 
-  -- University-wide monitoring: sectors and colleges are required for filters.
-  if acct.role = 'it_academic_integrity' then
-    return true;
-  end if;
+  select u.id
+  from org_units u, acct
+  where acct.role = 'it_academic_integrity'
 
-  if acct.role = 'senior_management' then
-    if acct.scope_id is null then
-      return false;
-    end if;
-    select * into node from org_units where id = acct.scope_id;
-    if not found then
-      return false;
-    end if;
-    if node.level = 'university' then
-      return true;
-    end if;
-    if node.level = 'sector' then
-      return p_id = node.id
-          or (target.level = 'program' and target.parent_id = node.id);
-    end if;
-    return p_id = node.id or p_id = node.parent_id;
-  end if;
+  union
 
-  if acct.role in ('program_director', 'academic_affairs') then
-    if acct.scope_id is null then
-      return false;
-    end if;
-    select * into node from org_units where id = acct.scope_id;
-    if not found then
-      return false;
-    end if;
-    return p_id = node.id or p_id = node.parent_id;
-  end if;
+  select u.id
+  from org_units u, acct
+  join org_units n on n.id = acct.scope_id
+  where acct.role = 'senior_management'
+    and n.level = 'university'
 
-  if acct.role = 'professor' then
-    return exists (
-      select 1
-      from courses c
-      join org_units p on p.id = c.program_id
-      where c.id in (select current_professor_course_ids())
-        and (p.id = p_id or p.parent_id = p_id)
-    );
-  end if;
+  union
 
-  if acct.role = 'student' then
-    return exists (
-      select 1
-      from students s
-      join org_units p on p.id = s.program_id
-      where s.id = acct.student_id
-        and (p.id = p_id or p.parent_id = p_id)
-    );
-  end if;
+  select u.id
+  from org_units u, acct
+  join org_units n on n.id = acct.scope_id
+  where acct.role = 'senior_management'
+    and n.level = 'sector'
+    and u.level = 'program'
+    and u.parent_id = n.id
 
-  return false;
-end;
+  union
+
+  select n.parent_id
+  from acct
+  join org_units n on n.id = acct.scope_id
+  where acct.role = 'senior_management'
+    and n.level not in ('university', 'sector')
+    and n.parent_id is not null
+
+  union
+
+  select n.parent_id
+  from acct
+  join org_units n on n.id = acct.scope_id
+  where acct.role in ('program_director', 'academic_affairs')
+    and n.parent_id is not null
+
+  union
+
+  select p.id
+  from acct
+  join staff_course_assignments sca on sca.staff_person_id = acct.person_id
+  join courses c on c.id = sca.course_id
+  join org_units p on p.id = c.program_id
+  where acct.role = 'professor'
+
+  union
+
+  select p.parent_id
+  from acct
+  join staff_course_assignments sca on sca.staff_person_id = acct.person_id
+  join courses c on c.id = sca.course_id
+  join org_units p on p.id = c.program_id
+  where acct.role = 'professor'
+    and p.parent_id is not null
+
+  union
+
+  select p.id
+  from acct
+  join students s on s.id = acct.student_id
+  join org_units p on p.id = s.program_id
+  where acct.role = 'student'
+
+  union
+
+  select p.parent_id
+  from acct
+  join students s on s.id = acct.student_id
+  join org_units p on p.id = s.program_id
+  where acct.role = 'student'
+    and p.parent_id is not null
+$$;
+
+create or replace function org_unit_is_visible(p_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select coalesce(p_id in (select current_visible_org_unit_ids()), false);
 $$;
 
 create or replace function current_professor_course_ids()
@@ -727,116 +756,8 @@ as $$
   where e.student_id = (current_app_account()).student_id;
 $$;
 
-create or replace function student_is_visible(p_id text)
-returns boolean
-language plpgsql
-stable
-security definer
-set search_path = public
-set row_security = off
-as $$
-declare
-  acct user_accounts;
-begin
-  acct := current_app_account();
-  if acct is null or p_id is null then
-    return false;
-  end if;
-  if acct.role = 'student' then
-    return p_id = acct.student_id;
-  end if;
-  if acct.role = 'professor' then
-    return exists (
-      select 1
-      from enrollments e
-      join course_offerings o on o.id = e.offering_id
-      where e.student_id = p_id
-        and o.course_id in (select current_professor_course_ids())
-    );
-  end if;
-  -- IT: anyone sitting (or flagged on) an exam, for live monitoring.
-  if acct.role = 'it_academic_integrity' then
-    return exists (select 1 from exam_attempts a where a.student_id = p_id)
-        or exists (
-          select 1
-          from integrity_flags f
-          join exam_attempts a on a.id = f.attempt_id
-          where a.student_id = p_id
-        );
-  end if;
-  return exists (
-    select 1 from students s
-    where s.id = p_id
-      and s.program_id in (select current_visible_program_ids())
-  );
-end;
-$$;
-
-create or replace function course_is_visible(p_id text)
-returns boolean
-language plpgsql
-stable
-security definer
-set search_path = public
-set row_security = off
-as $$
-declare
-  acct user_accounts;
-begin
-  acct := current_app_account();
-  if acct is null or p_id is null then
-    return false;
-  end if;
-  if acct.role = 'professor' then
-    return p_id in (select current_professor_course_ids());
-  end if;
-  if acct.role = 'student' then
-    return p_id in (select current_student_course_ids());
-  end if;
-  if acct.role = 'it_academic_integrity' then
-    return exists (
-      select 1
-      from course_offerings o
-      join exams x on x.offering_id = o.id
-      where o.course_id = p_id
-    );
-  end if;
-  return exists (
-    select 1 from courses c
-    where c.id = p_id
-      and c.program_id in (select current_visible_program_ids())
-  );
-end;
-$$;
-
-create or replace function offering_is_visible(p_id text)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-set row_security = off
-as $$
-  select coalesce(course_is_visible(o.course_id), false)
-  from course_offerings o
-  where o.id = p_id;
-$$;
-
-create or replace function exam_is_visible(p_id text)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-set row_security = off
-as $$
-  select coalesce(offering_is_visible(x.offering_id), false)
-  from exams x
-  where x.id = p_id;
-$$;
-
-create or replace function exam_attempt_is_visible(p_student_id text, p_exam_id text)
-returns boolean
+create or replace function current_visible_student_ids()
+returns setof text
 language plpgsql
 stable
 security definer
@@ -848,22 +769,253 @@ declare
 begin
   acct := current_app_account();
   if acct is null then
-    return false;
+    return;
   end if;
-  if not student_is_visible(p_student_id) then
-    return false;
+  if acct.role = 'student' then
+    return query
+      select acct.student_id
+      where acct.student_id is not null;
+    return;
   end if;
   if acct.role = 'professor' then
-    return exists (
-      select 1
-      from exams x
-      join course_offerings o on o.id = x.offering_id
-      where x.id = p_exam_id
-        and o.course_id in (select current_professor_course_ids())
-    );
+    return query
+      select distinct e.student_id
+      from staff_course_assignments sca
+      join course_offerings o on o.course_id = sca.course_id
+      join enrollments e on e.offering_id = o.id
+      where sca.staff_person_id = acct.person_id;
+    return;
   end if;
-  return true;
+  if acct.role = 'it_academic_integrity' then
+    return query
+      select distinct a.student_id from exam_attempts a
+      union
+      select distinct a.student_id
+      from integrity_flags f
+      join exam_attempts a on a.id = f.attempt_id;
+    return;
+  end if;
+  return query
+    select s.id
+    from students s
+    where s.program_id in (select current_visible_program_ids());
 end;
+$$;
+
+create or replace function current_visible_course_ids()
+returns setof text
+language plpgsql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+declare
+  acct user_accounts;
+begin
+  acct := current_app_account();
+  if acct is null then
+    return;
+  end if;
+  if acct.role = 'professor' then
+    return query
+      select sca.course_id
+      from staff_course_assignments sca
+      where sca.staff_person_id = acct.person_id;
+    return;
+  end if;
+  if acct.role = 'student' then
+    return query
+      select o.course_id
+      from enrollments e
+      join course_offerings o on o.id = e.offering_id
+      where e.student_id = acct.student_id;
+    return;
+  end if;
+  if acct.role = 'it_academic_integrity' then
+    return query
+      select distinct o.course_id
+      from course_offerings o
+      join exams x on x.offering_id = o.id;
+    return;
+  end if;
+  return query
+    select c.id
+    from courses c
+    where c.program_id in (select current_visible_program_ids());
+end;
+$$;
+
+create or replace function current_visible_offering_ids()
+returns setof text
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select o.id
+  from course_offerings o
+  where o.course_id in (select current_visible_course_ids());
+$$;
+
+create or replace function current_visible_exam_ids()
+returns setof text
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select x.id
+  from exams x
+  where x.offering_id in (select current_visible_offering_ids());
+$$;
+
+create or replace function current_visible_attempt_ids()
+returns setof text
+language plpgsql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+declare
+  acct user_accounts;
+begin
+  acct := current_app_account();
+  if acct is null then
+    return;
+  end if;
+  if acct.role = 'professor' then
+    return query
+      select a.id
+      from exam_attempts a
+      join exams x on x.id = a.exam_id
+      join course_offerings o on o.id = x.offering_id
+      join staff_course_assignments sca
+        on sca.course_id = o.course_id
+       and sca.staff_person_id = acct.person_id
+      where a.student_id in (
+        select e.student_id
+        from staff_course_assignments assigned
+        join course_offerings eo on eo.course_id = assigned.course_id
+        join enrollments e on e.offering_id = eo.id
+        where assigned.staff_person_id = acct.person_id
+      );
+    return;
+  end if;
+  return query
+    select a.id
+    from exam_attempts a
+    where a.student_id in (select current_visible_student_ids());
+end;
+$$;
+
+create or replace function current_visible_person_ids()
+returns setof text
+language plpgsql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+declare
+  acct user_accounts;
+begin
+  acct := current_app_account();
+  if acct is null then
+    return;
+  end if;
+  return query
+    select acct.person_id
+    where acct.person_id is not null;
+  if acct.role = 'student' then
+    return;
+  end if;
+  return query
+    select s.person_id
+    from students s
+    where s.id in (select current_visible_student_ids());
+  return query
+    select st.person_id
+    from staff st
+    where st.person_id = acct.person_id
+       or st.org_unit_id in (select current_visible_org_unit_ids());
+  return query
+    select o.instructor_id
+    from course_offerings o
+    where o.course_id in (select current_visible_course_ids());
+end;
+$$;
+
+create or replace function student_is_visible(p_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select coalesce(p_id in (select current_visible_student_ids()), false);
+$$;
+
+create or replace function course_is_visible(p_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select coalesce(p_id in (select current_visible_course_ids()), false);
+$$;
+
+create or replace function offering_is_visible(p_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select coalesce(p_id in (select current_visible_offering_ids()), false);
+$$;
+
+create or replace function exam_is_visible(p_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select coalesce(p_id in (select current_visible_exam_ids()), false);
+$$;
+
+create or replace function exam_attempt_is_visible(p_student_id text, p_exam_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select coalesce(
+    p_student_id in (select current_visible_student_ids())
+    and (
+      (select (current_app_account()).role) is distinct from 'professor'
+      or p_exam_id in (
+        select x.id
+        from exams x
+        join course_offerings o on o.id = x.offering_id
+        join staff_course_assignments sca
+          on sca.course_id = o.course_id
+         and sca.staff_person_id = (select (current_app_account()).person_id)
+      )
+    ),
+    false
+  );
 $$;
 
 create or replace function attempt_is_visible(p_id text)
@@ -874,9 +1026,7 @@ security definer
 set search_path = public
 set row_security = off
 as $$
-  select coalesce(exam_attempt_is_visible(a.student_id, a.exam_id), false)
-  from exam_attempts a
-  where a.id = p_id;
+  select coalesce(p_id in (select current_visible_attempt_ids()), false);
 $$;
 
 -- Class average for a student's own dashboard without leaking other rows.
@@ -915,15 +1065,9 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Row level security
--- Policies call SECURITY DEFINER helpers so FORCE RLS cannot recurse.
--- Visibility:
---   President / VP AA     university (every program)
---   Sector dean           colleges in the sector
---   Program director      own college
---   Academic affairs      students of own college
---   Professor             assigned curricula
---   IT / integrity        live exams + flagged attempts
---   Student               own performance
+-- Policies use uncorrelated IN (SELECT current_visible_*_ids()) so PostgreSQL
+-- can InitPlan authorization once per statement. Boolean helpers remain for
+-- SQL/RPC callers and wrap those sets.
 -- ---------------------------------------------------------------------------
 
 alter table org_units enable row level security;
@@ -948,91 +1092,66 @@ alter table transcript_entries enable row level security;
 
 drop policy if exists org_units_read on org_units;
 create policy org_units_read on org_units
-  for select using (org_unit_is_visible(id));
+  for select using (id in (select current_visible_org_unit_ids()));
 
 drop policy if exists institution_settings_read on institution_settings;
 create policy institution_settings_read on institution_settings
-  for select using (org_unit_is_visible(org_unit_id));
+  for select using (org_unit_id in (select current_visible_org_unit_ids()));
 
 drop policy if exists academic_years_read on academic_years;
 create policy academic_years_read on academic_years
-  for select using ((current_app_account()).id is not null);
+  for select using ((select (current_app_account()).id) is not null);
 
 drop policy if exists terms_read on terms;
 create policy terms_read on terms
-  for select using ((current_app_account()).id is not null);
+  for select using ((select (current_app_account()).id) is not null);
 
 drop policy if exists people_read on people;
 create policy people_read on people
-  for select using (
-    id = (current_app_account()).person_id
-    or (
-      (current_app_account()).role <> 'student'
-      and (
-        exists (
-          select 1 from students s
-          where s.person_id = people.id and student_is_visible(s.id)
-        )
-        or exists (
-          select 1 from staff st
-          where st.person_id = people.id
-            and (
-              st.person_id = (current_app_account()).person_id
-              or org_unit_is_visible(st.org_unit_id)
-            )
-        )
-        or exists (
-          select 1
-          from course_offerings o
-          where o.instructor_id = people.id
-            and course_is_visible(o.course_id)
-        )
-      )
-    )
-  );
+  for select using (id in (select current_visible_person_ids()));
 
 drop policy if exists staff_read on staff;
 create policy staff_read on staff
   for select using (
-    (current_app_account()).role <> 'student'
+    (select (current_app_account()).role) is distinct from 'student'
     and (
-      person_id = (current_app_account()).person_id
-      or org_unit_is_visible(org_unit_id)
+      person_id = (select (current_app_account()).person_id)
+      or org_unit_id in (select current_visible_org_unit_ids())
     )
   );
 
 drop policy if exists students_read on students;
 create policy students_read on students
-  for select using (student_is_visible(id));
+  for select using (id in (select current_visible_student_ids()));
 
 drop policy if exists user_accounts_read on user_accounts;
 create policy user_accounts_read on user_accounts
-  for select using (id = (current_app_account()).id);
+  for select using (id = (select (current_app_account()).id));
 
 drop policy if exists courses_read on courses;
 create policy courses_read on courses
-  for select using (course_is_visible(id));
+  for select using (id in (select current_visible_course_ids()));
 
 drop policy if exists course_offerings_read on course_offerings;
 create policy course_offerings_read on course_offerings
-  for select using (course_is_visible(course_id));
+  for select using (course_id in (select current_visible_course_ids()));
 
 drop policy if exists course_sections_read on course_sections;
 create policy course_sections_read on course_sections
-  for select using (coalesce(offering_is_visible(offering_id), false));
+  for select using (offering_id in (select current_visible_offering_ids()));
 
 drop policy if exists staff_course_assignments_read on staff_course_assignments;
 create policy staff_course_assignments_read on staff_course_assignments
   for select using (
-    (current_app_account()).role not in ('student', 'it_academic_integrity')
+    (select (current_app_account()).role) not in ('student', 'it_academic_integrity')
     and (
       (
-        (current_app_account()).role = 'professor'
-        and staff_person_id = (current_app_account()).person_id
+        (select (current_app_account()).role) = 'professor'
+        and staff_person_id = (select (current_app_account()).person_id)
       )
       or (
-        (current_app_account()).role <> 'professor'
-        and course_is_visible(course_id)
+        (select (current_app_account()).role) is distinct from 'professor'
+        and course_id in (select current_visible_course_ids())
       )
     )
   );
@@ -1040,54 +1159,50 @@ create policy staff_course_assignments_read on staff_course_assignments
 drop policy if exists enrollments_read on enrollments;
 create policy enrollments_read on enrollments
   for select using (
-    (current_app_account()).role <> 'it_academic_integrity'
-    and student_is_visible(student_id)
+    (select (current_app_account()).role) is distinct from 'it_academic_integrity'
+    and student_id in (select current_visible_student_ids())
     and (
-      (current_app_account()).role <> 'professor'
-      or exists (
-        select 1 from course_offerings o
-        where o.id = enrollments.offering_id
-          and o.course_id in (select current_professor_course_ids())
-      )
+      (select (current_app_account()).role) is distinct from 'professor'
+      or offering_id in (select current_visible_offering_ids())
     )
   );
 
 drop policy if exists exams_read on exams;
 create policy exams_read on exams
-  for select using (coalesce(offering_is_visible(offering_id), false));
+  for select using (offering_id in (select current_visible_offering_ids()));
 
 drop policy if exists questions_read on questions;
 create policy questions_read on questions
-  for select using (coalesce(exam_is_visible(exam_id), false));
+  for select using (exam_id in (select current_visible_exam_ids()));
 
 drop policy if exists exam_attempts_read on exam_attempts;
 create policy exam_attempts_read on exam_attempts
-  for select using (exam_attempt_is_visible(student_id, exam_id));
+  for select using (id in (select current_visible_attempt_ids()));
 
 drop policy if exists attempt_answers_read on attempt_answers;
 create policy attempt_answers_read on attempt_answers
-  for select using (coalesce(attempt_is_visible(attempt_id), false));
+  for select using (attempt_id in (select current_visible_attempt_ids()));
 
 drop policy if exists integrity_flags_read on integrity_flags;
 create policy integrity_flags_read on integrity_flags
   for select using (
-    (current_app_account()).role = 'it_academic_integrity'
+    (select (current_app_account()).role) = 'it_academic_integrity'
     or (
-      (current_app_account()).role in (
+      (select (current_app_account()).role) in (
         'senior_management',
         'program_director',
         'academic_affairs',
         'professor'
       )
-      and coalesce(attempt_is_visible(attempt_id), false)
+      and attempt_id in (select current_visible_attempt_ids())
     )
   );
 
 drop policy if exists transcript_entries_read on transcript_entries;
 create policy transcript_entries_read on transcript_entries
   for select using (
-    (current_app_account()).role <> 'it_academic_integrity'
-    and student_is_visible(student_id)
+    (select (current_app_account()).role) is distinct from 'it_academic_integrity'
+    and student_id in (select current_visible_student_ids())
   );
 
 comment on table org_units is 'University → sector → program tree. scope_id on user_accounts points here. Analytics "college" = program-level row.';
@@ -1099,7 +1214,16 @@ comment on column exams.is_synthetic is 'True for generated demo assessment rows
 comment on function current_app_account() is 'Reads app.current_user_id (user_accounts.id). Password hash is never returned. Set in the API session.';
 comment on function student_is_visible(text) is 'Whether the session role may see this student row.';
 comment on function course_is_visible(text) is 'Whether the session role may see this course row.';
-comment on function org_unit_is_visible(text) is 'Whether the session role may see this org_units row.';
+comment on function org_unit_is_visible(text) is
+  'Whether the session role may see this org_units row. Wrapper over current_visible_org_unit_ids().';
+comment on function current_visible_student_ids() is
+  'Session-visible student ids. STABLE SECURITY DEFINER, RLS off. Used as an uncorrelated IN-list so RLS can InitPlan once per statement.';
+comment on function current_visible_course_ids() is
+  'Session-visible course ids. STABLE SECURITY DEFINER, RLS off.';
+comment on function current_visible_org_unit_ids() is
+  'Session-visible org unit ids computed as a set. Does not call org_unit_is_visible() per row.';
+comment on function current_visible_attempt_ids() is
+  'Session-visible exam_attempt ids. Professor rows also require the exam course to be assigned.';
 
 -- ---------------------------------------------------------------------------
 -- Login + class-average helpers (SECURITY DEFINER, RLS off)
@@ -1115,6 +1239,7 @@ returns table (
     password_hash text
 )
 language plpgsql
+stable
 security definer
 set search_path = public
 set row_security = off
@@ -1141,12 +1266,12 @@ as $$
     and a.status <> 'absent'
     and a.score is not null
     and (
-      exam_is_visible(a.exam_id)
+      a.exam_id in (select current_visible_exam_ids())
       or exists (
         select 1
         from exam_attempts mine
         where mine.exam_id = a.exam_id
-          and mine.student_id = (current_app_account()).student_id
+          and mine.student_id = (select (current_app_account()).student_id)
       )
     )
   group by a.exam_id;
@@ -1199,6 +1324,13 @@ revoke all on function current_visible_program_ids() from public;
 revoke all on function org_unit_is_visible(text) from public;
 revoke all on function current_professor_course_ids() from public;
 revoke all on function current_student_course_ids() from public;
+revoke all on function current_visible_student_ids() from public;
+revoke all on function current_visible_course_ids() from public;
+revoke all on function current_visible_org_unit_ids() from public;
+revoke all on function current_visible_offering_ids() from public;
+revoke all on function current_visible_exam_ids() from public;
+revoke all on function current_visible_attempt_ids() from public;
+revoke all on function current_visible_person_ids() from public;
 revoke all on function student_is_visible(text) from public;
 revoke all on function course_is_visible(text) from public;
 revoke all on function offering_is_visible(text) from public;
@@ -1215,6 +1347,13 @@ grant execute on function current_visible_program_ids() to app_user;
 grant execute on function org_unit_is_visible(text) to app_user;
 grant execute on function current_professor_course_ids() to app_user;
 grant execute on function current_student_course_ids() to app_user;
+grant execute on function current_visible_student_ids() to app_user;
+grant execute on function current_visible_course_ids() to app_user;
+grant execute on function current_visible_org_unit_ids() to app_user;
+grant execute on function current_visible_offering_ids() to app_user;
+grant execute on function current_visible_exam_ids() to app_user;
+grant execute on function current_visible_attempt_ids() to app_user;
+grant execute on function current_visible_person_ids() to app_user;
 grant execute on function student_is_visible(text) to app_user;
 grant execute on function course_is_visible(text) to app_user;
 grant execute on function offering_is_visible(text) to app_user;
@@ -1224,6 +1363,44 @@ grant execute on function attempt_is_visible(text) to app_user;
 grant execute on function exam_class_average(text) to app_user;
 grant execute on function get_user_for_login(text) to app_user;
 grant execute on function get_exam_averages(text[]) to app_user;
+
+do $$
+declare
+  api_role text;
+  fn text;
+  sigs text[] := array[
+    'org_descendants(text)',
+    'current_app_account()',
+    'current_visible_program_ids()',
+    'org_unit_is_visible(text)',
+    'current_professor_course_ids()',
+    'current_student_course_ids()',
+    'current_visible_student_ids()',
+    'current_visible_course_ids()',
+    'current_visible_org_unit_ids()',
+    'current_visible_offering_ids()',
+    'current_visible_exam_ids()',
+    'current_visible_attempt_ids()',
+    'current_visible_person_ids()',
+    'student_is_visible(text)',
+    'course_is_visible(text)',
+    'offering_is_visible(text)',
+    'exam_is_visible(text)',
+    'exam_attempt_is_visible(text, text)',
+    'attempt_is_visible(text)',
+    'exam_class_average(text)',
+    'get_user_for_login(text)',
+    'get_exam_averages(text[])'
+  ];
+begin
+  foreach api_role in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = api_role) then
+      foreach fn in array sigs loop
+        execute format('revoke all on function %s from %I', fn, api_role);
+      end loop;
+    end if;
+  end loop;
+end $$;
 
 create table if not exists public.schema_migrations (
   version text primary key,
