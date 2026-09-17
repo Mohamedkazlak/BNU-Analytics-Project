@@ -617,94 +617,116 @@ begin
 end;
 $$;
 
-create or replace function org_unit_is_visible(p_id text)
-returns boolean
-language plpgsql
+create or replace function current_visible_org_unit_ids()
+returns setof text
+language sql
 stable
 security definer
 set search_path = public
 set row_security = off
 as $$
-declare
-  acct user_accounts;
-  node org_units;
-  target org_units;
-begin
-  acct := current_app_account();
-  if acct is null or p_id is null then
-    return false;
-  end if;
+  with acct as (
+    select * from current_app_account()
+  )
+  select u.id
+  from org_units u, acct
+  where acct.id is not null
+    and u.level = 'university'
 
-  select * into target from org_units where id = p_id;
-  if not found then
-    return false;
-  end if;
+  union
 
-  -- University root is needed for labels / filter ancestry by every role.
-  if target.level = 'university' then
-    return true;
-  end if;
+  select acct.scope_id
+  from acct
+  where acct.id is not null
+    and acct.scope_id is not null
 
-  if acct.scope_id is not null and p_id = acct.scope_id then
-    return true;
-  end if;
+  union
 
-  -- University-wide monitoring: sectors and colleges are required for filters.
-  if acct.role = 'it_academic_integrity' then
-    return true;
-  end if;
+  select u.id
+  from org_units u, acct
+  where acct.role = 'it_academic_integrity'
 
-  if acct.role = 'senior_management' then
-    if acct.scope_id is null then
-      return false;
-    end if;
-    select * into node from org_units where id = acct.scope_id;
-    if not found then
-      return false;
-    end if;
-    if node.level = 'university' then
-      return true;
-    end if;
-    if node.level = 'sector' then
-      return p_id = node.id
-          or (target.level = 'program' and target.parent_id = node.id);
-    end if;
-    return p_id = node.id or p_id = node.parent_id;
-  end if;
+  union
 
-  if acct.role in ('program_director', 'academic_affairs') then
-    if acct.scope_id is null then
-      return false;
-    end if;
-    select * into node from org_units where id = acct.scope_id;
-    if not found then
-      return false;
-    end if;
-    return p_id = node.id or p_id = node.parent_id;
-  end if;
+  select u.id
+  from org_units u, acct
+  join org_units n on n.id = acct.scope_id
+  where acct.role = 'senior_management'
+    and n.level = 'university'
 
-  if acct.role = 'professor' then
-    return exists (
-      select 1
-      from courses c
-      join org_units p on p.id = c.program_id
-      where c.id in (select current_professor_course_ids())
-        and (p.id = p_id or p.parent_id = p_id)
-    );
-  end if;
+  union
 
-  if acct.role = 'student' then
-    return exists (
-      select 1
-      from students s
-      join org_units p on p.id = s.program_id
-      where s.id = acct.student_id
-        and (p.id = p_id or p.parent_id = p_id)
-    );
-  end if;
+  select u.id
+  from org_units u, acct
+  join org_units n on n.id = acct.scope_id
+  where acct.role = 'senior_management'
+    and n.level = 'sector'
+    and u.level = 'program'
+    and u.parent_id = n.id
 
-  return false;
-end;
+  union
+
+  select n.parent_id
+  from acct
+  join org_units n on n.id = acct.scope_id
+  where acct.role = 'senior_management'
+    and n.level not in ('university', 'sector')
+    and n.parent_id is not null
+
+  union
+
+  select n.parent_id
+  from acct
+  join org_units n on n.id = acct.scope_id
+  where acct.role in ('program_director', 'academic_affairs')
+    and n.parent_id is not null
+
+  union
+
+  select p.id
+  from acct
+  join staff_course_assignments sca on sca.staff_person_id = acct.person_id
+  join courses c on c.id = sca.course_id
+  join org_units p on p.id = c.program_id
+  where acct.role = 'professor'
+
+  union
+
+  select p.parent_id
+  from acct
+  join staff_course_assignments sca on sca.staff_person_id = acct.person_id
+  join courses c on c.id = sca.course_id
+  join org_units p on p.id = c.program_id
+  where acct.role = 'professor'
+    and p.parent_id is not null
+
+  union
+
+  select p.id
+  from acct
+  join students s on s.id = acct.student_id
+  join org_units p on p.id = s.program_id
+  where acct.role = 'student'
+
+  union
+
+  select p.parent_id
+  from acct
+  join students s on s.id = acct.student_id
+  join org_units p on p.id = s.program_id
+  where acct.role = 'student'
+    and p.parent_id is not null
+$$;
+
+create or replace function org_unit_is_visible(p_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+set row_security = off
+as $$
+  select coalesce(p_id in (select current_visible_org_unit_ids()), false);
 $$;
 
 create or replace function current_professor_course_ids()
@@ -758,9 +780,10 @@ begin
   if acct.role = 'professor' then
     return query
       select distinct e.student_id
-      from enrollments e
-      join course_offerings o on o.id = e.offering_id
-      where o.course_id in (select current_professor_course_ids());
+      from staff_course_assignments sca
+      join course_offerings o on o.course_id = sca.course_id
+      join enrollments e on e.offering_id = o.id
+      where sca.staff_person_id = acct.person_id;
     return;
   end if;
   if acct.role = 'it_academic_integrity' then
@@ -795,11 +818,18 @@ begin
     return;
   end if;
   if acct.role = 'professor' then
-    return query select * from current_professor_course_ids();
+    return query
+      select sca.course_id
+      from staff_course_assignments sca
+      where sca.staff_person_id = acct.person_id;
     return;
   end if;
   if acct.role = 'student' then
-    return query select * from current_student_course_ids();
+    return query
+      select o.course_id
+      from enrollments e
+      join course_offerings o on o.id = e.offering_id
+      where e.student_id = acct.student_id;
     return;
   end if;
   if acct.role = 'it_academic_integrity' then
@@ -814,17 +844,6 @@ begin
     from courses c
     where c.program_id in (select current_visible_program_ids());
 end;
-$$;
-
-create or replace function current_visible_org_unit_ids()
-returns setof text
-language sql
-stable
-security definer
-set search_path = public
-set row_security = off
-as $$
-  select u.id from org_units u where org_unit_is_visible(u.id);
 $$;
 
 create or replace function current_visible_offering_ids()
@@ -872,13 +891,18 @@ begin
     return query
       select a.id
       from exam_attempts a
-      where a.student_id in (select current_visible_student_ids())
-        and a.exam_id in (
-          select x.id
-          from exams x
-          join course_offerings o on o.id = x.offering_id
-          where o.course_id in (select current_professor_course_ids())
-        );
+      join exams x on x.id = a.exam_id
+      join course_offerings o on o.id = x.offering_id
+      join staff_course_assignments sca
+        on sca.course_id = o.course_id
+       and sca.staff_person_id = acct.person_id
+      where a.student_id in (
+        select e.student_id
+        from staff_course_assignments assigned
+        join course_offerings eo on eo.course_id = assigned.course_id
+        join enrollments e on e.offering_id = eo.id
+        where assigned.staff_person_id = acct.person_id
+      );
     return;
   end if;
   return query
@@ -985,7 +1009,9 @@ as $$
         select x.id
         from exams x
         join course_offerings o on o.id = x.offering_id
-        where o.course_id in (select current_professor_course_ids())
+        join staff_course_assignments sca
+          on sca.course_id = o.course_id
+         and sca.staff_person_id = (select (current_app_account()).person_id)
       )
     ),
     false
@@ -1188,13 +1214,14 @@ comment on column exams.is_synthetic is 'True for generated demo assessment rows
 comment on function current_app_account() is 'Reads app.current_user_id (user_accounts.id). Password hash is never returned. Set in the API session.';
 comment on function student_is_visible(text) is 'Whether the session role may see this student row.';
 comment on function course_is_visible(text) is 'Whether the session role may see this course row.';
-comment on function org_unit_is_visible(text) is 'Whether the session role may see this org_units row.';
+comment on function org_unit_is_visible(text) is
+  'Whether the session role may see this org_units row. Wrapper over current_visible_org_unit_ids().';
 comment on function current_visible_student_ids() is
   'Session-visible student ids. STABLE SECURITY DEFINER, RLS off. Used as an uncorrelated IN-list so RLS can InitPlan once per statement.';
 comment on function current_visible_course_ids() is
   'Session-visible course ids. STABLE SECURITY DEFINER, RLS off.';
 comment on function current_visible_org_unit_ids() is
-  'Session-visible org unit ids. Delegates to org_unit_is_visible() over the small org_units table once per statement.';
+  'Session-visible org unit ids computed as a set. Does not call org_unit_is_visible() per row.';
 comment on function current_visible_attempt_ids() is
   'Session-visible exam_attempt ids. Professor rows also require the exam course to be assigned.';
 

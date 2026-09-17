@@ -1,9 +1,11 @@
 -- Purpose:
 -- Harden public.set_updated_at() against search_path hijacking, mark
 -- get_user_for_login() STABLE, and add the two missing foreign-key indexes.
+-- Independent of RLS policy rewrites and of application filter behavior.
 --
 -- Safety:
 -- Additive / definition-only. Does not modify or delete existing rows.
+-- Does not drop indexes, tables, or constraints.
 -- CREATE INDEX IF NOT EXISTS is used (not CONCURRENTLY) because
 -- backend/run_migration.py wraps each file in a transaction, and
 -- CREATE INDEX CONCURRENTLY cannot run inside a transaction. Tables are

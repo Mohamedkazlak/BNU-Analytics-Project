@@ -56,7 +56,7 @@ function writeStored(userId: string, filters: AnalyticsFilters) {
 }
 
 export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
-  const { user, role } = useRole();
+  const { user, role, viewer } = useRole();
   const [filters, setFilters] = useState<AnalyticsFilters>(() =>
     readStored(user.id),
   );
@@ -123,7 +123,11 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
   );
   const clear = useCallback(() => persist(emptyFilters()), [persist]);
 
-  const required = options?.required ?? [];
+  const required =
+    options?.required ??
+    (role === "senior_management" && viewer.level === "university"
+      ? ["sectorId", "collegeId"]
+      : []);
   const filtersReady =
     role === "student" ||
     required.every((key) => {

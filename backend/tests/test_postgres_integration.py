@@ -7,6 +7,7 @@ TEST_DATABASE_URL against a disposable Postgres service.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import subprocess
 import sys
@@ -156,6 +157,158 @@ def _policy_qual(url: str, table: str, policy: str) -> str:
     return rows[0]["qual"] if rows else ""
 
 
+RLS_EQUIVALENCE_USERS = (
+    "u-president",
+    "u-vp-aa",
+    "u-dean-eng",
+    "u-pd-cs",
+    "u-aa-cs",
+    "u-prof-cs",
+    "u-it-integrity",
+    "u-student",
+)
+
+RLS_EQUIVALENCE_QUERIES = {
+    "org_units": "SELECT id AS k FROM org_units ORDER BY 1",
+    "institution_settings": "SELECT org_unit_id AS k FROM institution_settings ORDER BY 1",
+    "academic_years": "SELECT id AS k FROM academic_years ORDER BY 1",
+    "terms": "SELECT id AS k FROM terms ORDER BY 1",
+    "people": "SELECT id AS k FROM people ORDER BY 1",
+    "staff": "SELECT person_id AS k FROM staff ORDER BY 1",
+    "students": "SELECT id AS k FROM students ORDER BY 1",
+    "user_accounts": "SELECT id AS k FROM user_accounts ORDER BY 1",
+    "courses": "SELECT id AS k FROM courses ORDER BY 1",
+    "course_offerings": "SELECT id AS k FROM course_offerings ORDER BY 1",
+    "course_sections": "SELECT id AS k FROM course_sections ORDER BY 1",
+    "staff_course_assignments": (
+        "SELECT staff_person_id || ':' || course_id AS k "
+        "FROM staff_course_assignments ORDER BY 1"
+    ),
+    "enrollments": "SELECT id AS k FROM enrollments ORDER BY 1",
+    "exams": "SELECT id AS k FROM exams ORDER BY 1",
+    "questions": "SELECT id AS k FROM questions ORDER BY 1",
+    "exam_attempts": "SELECT id AS k FROM exam_attempts ORDER BY 1",
+    "attempt_answers": (
+        "SELECT attempt_id || ':' || question_id AS k FROM attempt_answers ORDER BY 1"
+    ),
+    "integrity_flags": "SELECT id AS k FROM integrity_flags ORDER BY 1",
+    "transcript_entries": "SELECT id AS k FROM transcript_entries ORDER BY 1",
+    "v_students": "SELECT id AS k FROM v_students ORDER BY 1",
+    "v_exam_attempts": "SELECT id AS k FROM v_exam_attempts ORDER BY 1",
+}
+
+PER_ROW_AUTH_MARKERS = (
+    "exam_attempt_is_visible",
+    "student_is_visible(",
+    "org_unit_is_visible(",
+    "course_is_visible(",
+    "offering_is_visible(",
+    "exam_is_visible(",
+    "attempt_is_visible(",
+)
+
+
+def _legacy_schema_sql(tmp: Path) -> Path:
+    legacy = tmp / "legacy_schema.sql"
+    shown = None
+    for ref in (
+        "origin/production-hardening:db/schema.sql",
+        "production-hardening:db/schema.sql",
+        "main:db/schema.sql",
+        "origin/main:db/schema.sql",
+    ):
+        candidate = subprocess.run(
+            ["git", "show", ref],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if candidate.returncode == 0 and candidate.stdout.strip():
+            shown = candidate
+            break
+    if shown is None:
+        pytest.skip("a pre-optimization schema.sql is not available")
+    legacy.write_text(shown.stdout)
+    return legacy
+
+
+async def _snapshot_visible(dbname: str, user_id: str) -> dict[str, tuple[str, ...]]:
+    out: dict[str, tuple[str, ...]] = {}
+    for table, sql in RLS_EQUIVALENCE_QUERIES.items():
+        rows = await _fetch_as_app(dbname, user_id, sql)
+        out[table] = tuple(r["k"] for r in rows)
+    return out
+
+
+def _walk_plan(node: dict):
+    yield node
+    for child in node.get("Plans") or []:
+        yield from _walk_plan(child)
+
+
+def _plan_mentions_per_row_helpers(plan: dict) -> list[str]:
+    found: list[str] = []
+    for node in _walk_plan(plan):
+        blob = json.dumps(node)
+        for marker in PER_ROW_AUTH_MARKERS:
+            if marker in blob:
+                found.append(marker)
+    return sorted(set(found))
+
+
+async def _explain_as_app(dbname: str, user_id: str, sql: str) -> dict:
+    import asyncpg
+
+    conn = await asyncpg.connect(_app_url(dbname))
+    try:
+        async with conn.transaction():
+            await conn.execute(
+                "SELECT set_config('app.current_user_id', $1, true)",
+                user_id,
+            )
+            await conn.execute("SET LOCAL statement_timeout = '120s'")
+            rows = await conn.fetch(f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {sql}")
+            payload = rows[0][0]
+            if isinstance(payload, str):
+                payload = json.loads(payload)
+            if isinstance(payload, list):
+                payload = payload[0]
+            return payload
+    finally:
+        await conn.close()
+
+
+def _function_src(url: str, name: str) -> str:
+    rows = asyncio.run(
+        _fetch(
+            url,
+            """
+            SELECT pg_get_functiondef(p.oid) AS def
+            FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND p.proname = $1
+            """,
+            name,
+        )
+    )
+    return rows[0]["def"] if rows else ""
+
+
+def _constraint_names(url: str, table: str) -> set[str]:
+    rows = asyncio.run(
+        _fetch(
+            url,
+            """
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = ($1::text)::regclass
+            """,
+            f"public.{table}",
+        )
+    )
+    return {r["conname"] for r in rows}
+
+
 @pytest.fixture(scope="module")
 def fresh_db():
     _require_admin()
@@ -265,7 +418,6 @@ def test_migrated_schema_matches_fresh_curriculum_and_org_policy(fresh_db, migra
         "011",
         "012",
         "013",
-        "014",
     ]
     sector_col = asyncio.run(
         _fetch(
@@ -279,6 +431,22 @@ def test_migrated_schema_matches_fresh_curriculum_and_org_policy(fresh_db, migra
         )
     )
     assert [r["column_name"] for r in sector_col] == ["program_id", "sector_id"]
+    org_src = _function_src(fresh_db, "current_visible_org_unit_ids")
+    migrated_org_src = _function_src(migrated_db, "current_visible_org_unit_ids")
+    assert "org_unit_is_visible" not in org_src
+    assert "UNION" in org_src.upper()
+    assert "org_unit_is_visible" not in migrated_org_src
+    assert "UNION" in migrated_org_src.upper()
+    assert "exam_attempts_enrollment_student_fk" in _constraint_names(
+        fresh_db, "exam_attempts"
+    )
+    assert "exam_attempts_enrollment_student_fk" in _constraint_names(
+        migrated_db, "exam_attempts"
+    )
+    assert "enrollments_id_student_id_key" in _constraint_names(fresh_db, "enrollments")
+    assert "enrollments_id_student_id_key" in _constraint_names(
+        migrated_db, "enrollments"
+    )
 
 
 def test_migration_runner_skips_already_applied(migrated_db):
@@ -305,19 +473,15 @@ def test_migration_runner_skips_already_applied(migrated_db):
     )
     assert "skip 010_syn_transc_marker_backfill.sql (already applied)" in runner.stdout
     assert (
-        "skip 011_link_demo_student_to_imported_cs.sql (already applied)"
+        "skip 011_set_updated_at_search_path_and_fk_indexes.sql (already applied)"
         in runner.stdout
     )
     assert (
-        "skip 012_set_updated_at_search_path_and_fk_indexes.sql (already applied)"
+        "skip 012_exam_attempts_enrollment_student_fk.sql (already applied)"
         in runner.stdout
     )
     assert (
         "skip 013_rls_initplan_visibility_sets.sql (already applied)" in runner.stdout
-    )
-    assert (
-        "skip 014_exam_attempts_enrollment_student_fk.sql (already applied)"
-        in runner.stdout
     )
     assert not any(line.startswith("applied ") for line in runner.stdout.splitlines())
 
@@ -572,10 +736,9 @@ def test_migration_010_backfills_unmarked_syn_transc_via_runner():
           ('007', '007_org_unit_rls_and_helpers.sql'),
           ('008', '008_revoke_anon_execute_on_helpers.sql'),
           ('009', '009_disable_schema_migrations_rls.sql'),
-          ('011', '011_link_demo_student_to_imported_cs.sql'),
-          ('012', '012_set_updated_at_search_path_and_fk_indexes.sql'),
-          ('013', '013_rls_initplan_visibility_sets.sql'),
-          ('014', '014_exam_attempts_enrollment_student_fk.sql');
+          ('011', '011_set_updated_at_search_path_and_fk_indexes.sql'),
+          ('012', '012_exam_attempts_enrollment_student_fk.sql'),
+          ('013', '013_rls_initplan_visibility_sets.sql');
         """,
     )
     if setup.returncode != 0:
@@ -647,9 +810,8 @@ def test_migration_010_backfills_unmarked_syn_transc_via_runner():
         "011",
         "012",
         "013",
-        "014",
     ]
-    assert recorded[-1]["filename"] == "014_exam_attempts_enrollment_student_fk.sql"
+    assert recorded[-1]["filename"] == "013_rls_initplan_visibility_sets.sql"
 
     _apply_file(url, ROOT / "db" / "migrations" / "010_syn_transc_marker_backfill.sql")
     reapplied = asyncio.run(
@@ -809,3 +971,198 @@ def test_http_student_and_professor_scope(fresh_db):
             ).status_code
             == 403
         )
+
+
+def test_rls_vp_aa_sees_all_sectors(fresh_db):
+    rows = asyncio.run(
+        _fetch_as_app(
+            FRESH_DB,
+            "u-vp-aa",
+            "SELECT id FROM org_units WHERE level = 'sector'",
+        )
+    )
+    ids = {r["id"] for r in rows}
+    assert {"sec-engineering", "sec-health", "sec-humanities"} <= ids
+
+
+def test_exam_attempts_composite_fk_rejects_mismatched_student(fresh_db):
+    setup = _psql(
+        fresh_db,
+        sql="""
+        DO $$
+        DECLARE
+          attempt_exam text;
+          attempt_enroll text;
+          other_student text;
+        BEGIN
+          SELECT a.exam_id, a.enrollment_id, s.id
+            INTO attempt_exam, attempt_enroll, other_student
+          FROM exam_attempts a
+          JOIN students s ON s.id <> a.student_id
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM exam_attempts a2
+            WHERE a2.exam_id = a.exam_id
+              AND a2.student_id = s.id
+          )
+          LIMIT 1;
+          INSERT INTO exam_attempts (id, exam_id, student_id, enrollment_id, status)
+          VALUES (
+            'att-fk-mismatch-test',
+            attempt_exam,
+            other_student,
+            attempt_enroll,
+            'absent'
+          );
+        END $$;
+        """,
+    )
+    assert setup.returncode != 0, setup.stdout
+    assert "exam_attempts_enrollment_student_fk" in setup.stderr
+    leftover = asyncio.run(
+        _fetch(
+            fresh_db,
+            "SELECT 1 FROM exam_attempts WHERE id = 'att-fk-mismatch-test'",
+        )
+    )
+    assert leftover == []
+
+
+def test_migration_012_refuses_violating_rows_without_rewriting_them():
+    _require_admin()
+    dbname = "bnu_analytics_ci_fk012"
+    _recreate(dbname)
+    url = _db_url(dbname)
+    setup = _psql(
+        url,
+        sql="""
+        CREATE TABLE enrollments (
+          id text PRIMARY KEY,
+          student_id text NOT NULL
+        );
+        CREATE TABLE exam_attempts (
+          id text PRIMARY KEY,
+          enrollment_id text NOT NULL,
+          student_id text NOT NULL
+        );
+        INSERT INTO enrollments (id, student_id) VALUES ('enr-1', 's1');
+        INSERT INTO exam_attempts (id, enrollment_id, student_id)
+        VALUES ('att-1', 'enr-1', 's2');
+        """,
+    )
+    if setup.returncode != 0:
+        pytest.fail(setup.stderr)
+    migration = (
+        ROOT / "db" / "migrations" / "012_exam_attempts_enrollment_student_fk.sql"
+    )
+    result = _psql(url, "-f", str(migration))
+    assert result.returncode != 0
+    assert "exam_attempts_enrollment_student_fk" in result.stderr
+    rows = asyncio.run(
+        _fetch(url, "SELECT id, student_id FROM exam_attempts ORDER BY 1")
+    )
+    assert [(r["id"], r["student_id"]) for r in rows] == [("att-1", "s2")]
+    constraints = asyncio.run(
+        _fetch(
+            url,
+            """
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = 'public.exam_attempts'::regclass
+            """,
+        )
+    )
+    assert "exam_attempts_enrollment_student_fk" not in {
+        r["conname"] for r in constraints
+    }
+
+
+def test_rls_v_exam_attempts_plan_uses_initplan_not_per_row_helpers(fresh_db):
+    plan = asyncio.run(
+        _explain_as_app(
+            FRESH_DB,
+            "u-president",
+            "SELECT count(*) FROM public.v_exam_attempts",
+        )
+    )
+    assert _plan_mentions_per_row_helpers(plan) == []
+    blob = json.dumps(plan)
+    assert "hashed SubPlan" in blob
+    for node in _walk_plan(plan["Plan"]):
+        if node.get("Parent Relationship") == "SubPlan":
+            assert node.get("Actual Loops", 1) == 1
+    join_plan = asyncio.run(
+        _explain_as_app(
+            FRESH_DB,
+            "u-president",
+            """
+            SELECT count(*)
+            FROM public.v_exam_attempts a
+            JOIN public.v_students s ON s.id = a.student_id
+            """,
+        )
+    )
+    assert _plan_mentions_per_row_helpers(join_plan) == []
+    join_blob = json.dumps(join_plan)
+    assert "hashed SubPlan" in join_blob
+
+
+def test_rls_visibility_sets_match_pre_optimization_boolean_helpers(tmp_path):
+    _require_admin()
+    dbname = "bnu_analytics_ci_rls_eq"
+    _recreate(dbname)
+    url = _db_url(dbname)
+    _apply_file(url, _legacy_schema_sql(tmp_path))
+    _apply_file(url, SEED)
+    _prepare_app_user(url)
+
+    before: dict[str, dict[str, tuple[str, ...]]] = {}
+    for user_id in RLS_EQUIVALENCE_USERS:
+        before[user_id] = asyncio.run(_snapshot_visible(dbname, user_id))
+
+    before_plan = asyncio.run(
+        _explain_as_app(
+            dbname,
+            "u-president",
+            "SELECT count(*) FROM public.v_exam_attempts",
+        )
+    )
+
+    for name in (
+        "011_set_updated_at_search_path_and_fk_indexes.sql",
+        "012_exam_attempts_enrollment_student_fk.sql",
+        "013_rls_initplan_visibility_sets.sql",
+    ):
+        _apply_file(url, ROOT / "db" / "migrations" / name)
+
+    after: dict[str, dict[str, tuple[str, ...]]] = {}
+    for user_id in RLS_EQUIVALENCE_USERS:
+        after[user_id] = asyncio.run(_snapshot_visible(dbname, user_id))
+
+    mismatches = []
+    for user_id in RLS_EQUIVALENCE_USERS:
+        for table in RLS_EQUIVALENCE_QUERIES:
+            if before[user_id][table] != after[user_id][table]:
+                mismatches.append(
+                    (
+                        user_id,
+                        table,
+                        len(before[user_id][table]),
+                        len(after[user_id][table]),
+                    )
+                )
+    assert mismatches == [], mismatches
+
+    after_plan = asyncio.run(
+        _explain_as_app(
+            dbname,
+            "u-president",
+            "SELECT count(*) FROM public.v_exam_attempts",
+        )
+    )
+    assert _plan_mentions_per_row_helpers(after_plan) == []
+    assert _plan_mentions_per_row_helpers(before_plan)
+    assert before["u-dean-eng"]["org_units"] != before["u-president"]["org_units"]
+    assert "sec-health" not in before["u-dean-eng"]["org_units"]
+    assert "s70" not in before["u-student"]["students"]
+    assert before["u-it-integrity"]["transcript_entries"] == ()
+    _ = before_plan

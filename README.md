@@ -2,6 +2,8 @@
 
 A role-aware academic assessment analytics platform for Benha National University online testing programs.
 
+**Live app:** https://visual-files.lovable.app
+
 ## What it does
 
 BNU Analytics turns assessment activity into actionable reporting for university, sector, program, and course-level users. The application covers:
@@ -37,12 +39,12 @@ Longer notes: [architecture](docs/architecture.md), [authorization](docs/authori
 
 ## Stack
 
-| Layer    | Technology                                                              |
-| -------- | ----------------------------------------------------------------------- |
+| Layer | Technology |
+| --- | --- |
 | Frontend | React 19, TanStack Start/Router, TanStack Query, Tailwind CSS, Recharts |
-| Backend  | FastAPI, asyncpg, Pydantic, PyJWT                                       |
-| Database | PostgreSQL / Supabase, Row Level Security                               |
-| Tooling  | Vite, TypeScript, ESLint, Prettier, Vitest, pytest                      |
+| Backend | FastAPI, asyncpg, Pydantic, PyJWT |
+| Database | PostgreSQL / Supabase, Row Level Security |
+| Tooling | Vite, TypeScript, ESLint, Prettier, Vitest, pytest |
 
 ## Local development
 

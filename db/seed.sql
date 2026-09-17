@@ -375,8 +375,6 @@ insert into user_accounts (id, person_id, role, scope_id, student_id, is_demo) v
   ('u-aa-cs', 'p-sara-mansour', 'academic_affairs', 'prog-computer-science', null, true),
   ('u-prof-cs', 'p-tomas-oyelaran', 'professor', 'prog-computer-science', null, true),
   ('u-it-integrity', 'p-layla-nasser', 'it_academic_integrity', null, null, true),
-  -- Seed login is Omar Haddad (s7). Migration 011 remaps u-student onto an
-  -- imported Computer Science roster student when that roster is present.
   ('u-student', 'p-s7', 'student', 'prog-computer-science', 's7', true);
 
 

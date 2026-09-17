@@ -1,6 +1,6 @@
 import asyncpg
 
-from core.authorization import AuthScope, required_filter_fields, visible_filter_fields
+from core.authorization import required_filter_fields, visible_filter_fields
 from repositories.accounts import load_auth_scope
 from schemas.auth import UserContext
 from schemas.filters import (
@@ -12,12 +12,6 @@ from schemas.filters import (
 )
 
 STUDENT_PAGE_SIZE = 150
-
-
-def _is_university_wide_viewer(scope: AuthScope) -> bool:
-    if scope.role == "it_academic_integrity":
-        return True
-    return scope.role == "senior_management" and scope.scope_level == "university"
 
 
 def _student_search_clause(alias: str, index: int) -> str:
@@ -57,20 +51,22 @@ async def get_filter_options(
 
     if "college" in visible:
         sector_id = filters.sector_id or scope.sector_id
-        rows = await db.fetch(
-            """
-            SELECT id, name, parent_id
-            FROM org_units
-            WHERE level = 'program'
-              AND ($1::text IS NULL OR parent_id = $1)
-            ORDER BY name
-            """,
-            sector_id,
-        )
-        colleges = [
-            FilterOption(id=r["id"], name=r["name"], parentId=r["parent_id"])
-            for r in rows
-        ]
+        if not sector_id and "sector" in visible:
+            colleges = []
+        else:
+            rows = await db.fetch(
+                """
+                SELECT id, name, parent_id
+                FROM org_units
+                WHERE level = 'program'
+                  AND ($1::text IS NULL OR parent_id = $1)
+                ORDER BY name
+                """,
+                sector_id,
+            )
+            colleges = [
+                FilterOption(id=r["id"], name=r["name"], parentId=r["parent_id"]) for r in rows
+            ]
 
     if "curriculum" in visible:
         college_id = filters.college_id or scope.college_id
@@ -107,26 +103,15 @@ async def get_filter_options(
                 """,
                 sector_id,
             )
-        elif _is_university_wide_viewer(scope):
-            rows = await db.fetch(
-                """
-                SELECT c.id, c.code, c.name, c.program_id
-                FROM courses c
-                ORDER BY c.code
-                """
-            )
         else:
             rows = []
         curricula = [
-            CurriculumOption(
-                id=r["id"], code=r["code"], name=r["name"], collegeId=r["program_id"]
-            )
+            CurriculumOption(id=r["id"], code=r["code"], name=r["name"], collegeId=r["program_id"])
             for r in rows
         ]
 
     load_students = "student" in visible and (
         scope.role == "professor"
-        or _is_university_wide_viewer(scope)
         or filters.curriculum_id
         or filters.college_id
         or scope.college_id
@@ -155,58 +140,49 @@ async def get_filter_options(
             )
         elif scope.role == "it_academic_integrity":
             college_id = filters.college_id or scope.college_id
-            sector_id = filters.sector_id or scope.sector_id
             rows = await db.fetch(
                 f"""
                 SELECT DISTINCT s.id, pe.full_name AS name, s.program_id
                 FROM students s
                 JOIN people pe ON pe.id = s.person_id
-                JOIN org_units p ON p.id = s.program_id
                 JOIN exam_attempts a ON a.student_id = s.id
                 LEFT JOIN enrollments e ON e.student_id = s.id
                 LEFT JOIN course_offerings o ON o.id = e.offering_id
                 WHERE ($1::text IS NULL OR s.program_id = $1)
                   AND ($2::text IS NULL OR o.course_id = $2)
-                  AND ($3::text IS NULL OR p.parent_id = $3)
-                  {_student_search_clause("pe", 4)}
+                  {_student_search_clause("pe", 3)}
                 ORDER BY pe.full_name
-                LIMIT $5
+                LIMIT $4
                 """,
                 college_id,
                 filters.curriculum_id,
-                sector_id,
                 query,
                 fetch_limit,
             )
         else:
             college_id = filters.college_id or scope.college_id
-            sector_id = filters.sector_id or scope.sector_id
             rows = await db.fetch(
                 f"""
                 SELECT DISTINCT s.id, pe.full_name AS name, s.program_id
                 FROM students s
                 JOIN people pe ON pe.id = s.person_id
-                JOIN org_units p ON p.id = s.program_id
                 LEFT JOIN enrollments e ON e.student_id = s.id
                 LEFT JOIN course_offerings o ON o.id = e.offering_id
                 WHERE ($1::text IS NULL OR s.program_id = $1)
                   AND ($2::text IS NULL OR o.course_id = $2)
-                  AND ($3::text IS NULL OR p.parent_id = $3)
-                  {_student_search_clause("pe", 4)}
+                  {_student_search_clause("pe", 3)}
                 ORDER BY pe.full_name
-                LIMIT $5
+                LIMIT $4
                 """,
                 college_id,
                 filters.curriculum_id,
-                sector_id,
                 query,
                 fetch_limit,
             )
         has_more_students = len(rows) > STUDENT_PAGE_SIZE
         rows = rows[:STUDENT_PAGE_SIZE]
         students = [
-            StudentOption(id=r["id"], name=r["name"], collegeId=r["program_id"])
-            for r in rows
+            StudentOption(id=r["id"], name=r["name"], collegeId=r["program_id"]) for r in rows
         ]
 
     contains_synthetic = bool(

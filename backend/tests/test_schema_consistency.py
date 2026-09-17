@@ -73,50 +73,76 @@ def test_migration_008_revokes_explicit_anon_execute():
     assert "from pg_roles" in migration
 
 
-def test_migration_012_hardens_search_path_and_adds_fk_indexes():
-    migration = (
-        ROOT / "db" / "migrations" / "012_set_updated_at_search_path_and_fk_indexes.sql"
-    ).read_text()
+def _migration_sql(name: str) -> str:
+    return (ROOT / "db" / "migrations" / name).read_text()
+
+
+def _active_sql(text: str) -> str:
+    sql_lines = [
+        line
+        for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("--")
+    ]
+    return "\n".join(sql_lines).lower()
+
+
+def test_optimization_migrations_are_additive_definition_only():
+    schema = (ROOT / "db" / "schema.sql").read_text()
+    assert "course_offerings_academic_year_id_idx" in schema
+    assert "transcript_entries_course_id_idx" in schema
+    assert "exam_attempts_enrollment_student_fk" in schema
+    assert "enrollments_id_student_id_key" in schema
+    assert "select u.id from org_units u where org_unit_is_visible" not in schema.lower()
+    for name in (
+        "011_set_updated_at_search_path_and_fk_indexes.sql",
+        "012_exam_attempts_enrollment_student_fk.sql",
+        "013_rls_initplan_visibility_sets.sql",
+    ):
+        sql = _active_sql(_migration_sql(name))
+        assert "delete from" not in sql, name
+        assert "truncate " not in sql, name
+        assert "drop table" not in sql, name
+        assert "drop index" not in sql, name
+        assert "drop constraint" not in sql, name
+        assert "disable row level security" not in sql, name
+        assert "disable trigger" not in sql, name
+        assert "update user_accounts" not in sql, name
+        assert "update students" not in sql, name
+        assert "update exam_attempts" not in sql, name
+
+
+def test_migration_011_hardens_search_path_and_adds_fk_indexes():
+    migration = _migration_sql("011_set_updated_at_search_path_and_fk_indexes.sql")
     assert "set search_path = public" in migration
     assert "course_offerings_academic_year_id_idx" in migration
     assert "transcript_entries_course_id_idx" in migration
-    sql_lines = [
-        line
-        for line in migration.splitlines()
-        if line.strip() and not line.lstrip().startswith("--")
-    ]
-    sql = "\n".join(sql_lines).lower()
+    sql = _active_sql(migration)
     assert "create index concurrently" not in sql
     assert "drop index" not in sql
 
 
-def test_migration_013_uses_initplan_visibility_sets():
-    migration = (
-        ROOT / "db" / "migrations" / "013_rls_initplan_visibility_sets.sql"
-    ).read_text()
-    sql_lines = [
-        line
-        for line in migration.splitlines()
-        if line.strip() and not line.lstrip().startswith("--")
-    ]
-    sql = "\n".join(sql_lines).lower()
-    assert "id in (select current_visible_student_ids())" in sql
-    assert "id in (select current_visible_attempt_ids())" in sql
-    assert "disable row level security" not in sql
-    assert "force row level security" not in sql
-    assert "drop table" not in sql
-
-
-def test_migration_014_adds_enrollment_student_fk():
-    migration = (
-        ROOT / "db" / "migrations" / "014_exam_attempts_enrollment_student_fk.sql"
-    ).read_text()
+def test_migration_012_adds_enrollment_student_fk_only_when_clean():
+    migration = _migration_sql("012_exam_attempts_enrollment_student_fk.sql")
     lowered = migration.lower()
     assert "exam_attempts_enrollment_student_fk" in migration
     assert "foreign key (enrollment_id, student_id)" in lowered
+    assert "raise exception" in lowered
     assert "delete from" not in lowered
     assert "update exam_attempts" not in lowered
     assert "update enrollments" not in lowered
+
+
+def test_migration_013_uses_set_based_initplan_visibility():
+    migration = _migration_sql("013_rls_initplan_visibility_sets.sql")
+    sql = _active_sql(migration)
+    assert "id in (select current_visible_student_ids())" in sql
+    assert "id in (select current_visible_attempt_ids())" in sql
+    assert "id in (select current_visible_org_unit_ids())" in sql
+    assert "from org_units u where org_unit_is_visible" not in sql
+    assert "org_unit_is_visible(u.id)" not in sql
+    assert "disable row level security" not in sql
+    assert "force row level security" not in sql
+    assert "drop table" not in sql
 
 
 def test_migration_010_only_backfills_unmarked_syn_transc_rows():

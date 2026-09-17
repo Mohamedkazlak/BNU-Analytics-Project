@@ -19,7 +19,11 @@ export function AnalyticsFilters() {
   if (role === "student") return null;
 
   const visible = options?.visible ?? defaultVisible(role, viewer.level);
-  const required = options?.required ?? [];
+  const required =
+    options?.required ??
+    (role === "senior_management" && viewer.level === "university"
+      ? ["sectorId", "collegeId"]
+      : []);
   const showSector = visible.includes("sector");
   const showCollege = visible.includes("college");
   const showCurriculum = visible.includes("curriculum");

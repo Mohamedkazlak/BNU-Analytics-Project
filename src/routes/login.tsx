@@ -59,7 +59,7 @@ const DEMO_ACCOUNTS = [
     title: "Student",
     route: "/my-progress",
     badge: "bg-green-50 text-green-700 ring-green-700/10",
-    description: "Sees own Computer Science performance & recommendations",
+    description: "Sees his own performance & recommendations",
   },
 ] as const;
 
