@@ -54,9 +54,10 @@ Shared shape:
 - `curriculumId` → `courses.id`
 - `studentId` → `students.id`
 
-University-wide senior management must select sector and college before
-analytics endpoints return data. Other roles have defaults injected from their
-authorized `scope_id` and cannot expand that scope.
+University-wide senior management (President, VP for Academic Affairs) see
+the full university first. Sector, college, curriculum and student filters
+remain available to narrow that view. Other roles have defaults injected from
+their authorized `scope_id` and cannot expand that scope.
 
 Filter options (`GET /api/filter-options`) return only values the caller may
 use. Student lists are limited for the UI and, for professors, restricted to

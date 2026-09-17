@@ -21,15 +21,15 @@ also not a security boundary.
 
 ## Roles
 
-| Account | `user_accounts.role` | Typical `org_units.level` | UI filters | Org metadata visible via RLS |
-| --- | --- | --- | --- | --- |
-| University senior management | `senior_management` | `university` | Sector, College, Curriculum, Student (sector + college required) | University, all sectors, all colleges |
-| Sector dean | `senior_management` | `sector` | College, Curriculum, Student (locked to own sector) | University, own sector, colleges in that sector |
-| Program director | `program_director` | `program` | Curriculum, Student (locked to own college) | University, parent sector, own college |
-| Academic affairs | `academic_affairs` | `program` | Curriculum, Student (locked to own college) | Same as program director |
-| Professor | `professor` | n/a | Student (assigned courses/sections only) | University plus sector/college of assigned curricula |
-| IT / academic integrity | `it_academic_integrity` | often null / university | Sector, College, Curriculum, Student | University-wide org metadata needed for monitoring filters |
-| Student | `student` | n/a | none (own record only) | University, own college, parent sector |
+| Account                      | `user_accounts.role`    | Typical `org_units.level` | UI filters                                                              | Org metadata visible via RLS                               |
+| ---------------------------- | ----------------------- | ------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| University senior management | `senior_management`     | `university`              | Sector, College, Curriculum, Student (optional; starts university-wide) | University, all sectors, all colleges                      |
+| Sector dean                  | `senior_management`     | `sector`                  | College, Curriculum, Student (locked to own sector)                     | University, own sector, colleges in that sector            |
+| Program director             | `program_director`      | `program`                 | Curriculum, Student (locked to own college)                             | University, parent sector, own college                     |
+| Academic affairs             | `academic_affairs`      | `program`                 | Curriculum, Student (locked to own college)                             | Same as program director                                   |
+| Professor                    | `professor`             | n/a                       | Student (assigned courses/sections only)                                | University plus sector/college of assigned curricula       |
+| IT / academic integrity      | `it_academic_integrity` | often null / university   | Sector, College, Curriculum, Student                                    | University-wide org metadata needed for monitoring filters |
+| Student                      | `student`               | n/a                       | none (own record only)                                                  | University, own college, parent sector                     |
 
 Role and scope are loaded from `user_accounts` on every request
 (`get_live_user`). A JWT that claims a different role is ignored.

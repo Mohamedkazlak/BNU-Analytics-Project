@@ -11,12 +11,11 @@ from schemas.filters import AnalyticsFilters
 from tests.helpers import make_scope
 
 
-def test_university_sm_requires_sector_and_college():
+def test_university_sm_sees_all_without_filters():
     scope = make_scope()
-    assert required_filter_fields(scope) == ["sectorId", "collegeId"]
-    with pytest.raises(HTTPException) as exc:
-        assert_filters_in_scope(scope, AnalyticsFilters(sector_id="sec-a"))
-    assert exc.value.status_code == 400
+    assert required_filter_fields(scope) == []
+    assert_filters_in_scope(scope, AnalyticsFilters())
+    assert_filters_in_scope(scope, AnalyticsFilters(sector_id="sec-a"))
 
 
 def test_university_sm_accepts_sector_and_college():

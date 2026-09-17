@@ -148,7 +148,7 @@ function MyProgress() {
                 tick={{ fontSize: 11, fill: chartColors.axis }}
                 axisLine={false}
                 tickLine={false}
-                width={110}
+                width={168}
               />
               <Tooltip contentStyle={tooltipStyle} />
               <Bar

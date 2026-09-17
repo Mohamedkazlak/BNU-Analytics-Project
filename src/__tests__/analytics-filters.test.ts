@@ -16,6 +16,15 @@ describe("role-based-filter-visibility", () => {
     expect(visible).toContain("college");
   });
 
+  it("does not require a sector or college before loading university-wide data", () => {
+    expect(defaultVisible("senior_management", "university")).toEqual([
+      "sector",
+      "college",
+      "curriculum",
+      "student",
+    ]);
+  });
+
   it("hides Sector and shows College for a sector dean", () => {
     const visible = defaultVisible("senior_management", "sector");
     expect(visible).not.toContain("sector");

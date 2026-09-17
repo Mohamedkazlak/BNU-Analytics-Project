@@ -6,6 +6,68 @@ from schemas.auth import UserContext
 from schemas.filters import AnalyticsFilters
 from services.gpa import standing_from_gpa
 
+_GENERIC_TOPICS = frozenset({"", "course assessment", "general", "none"})
+
+
+def use_curriculum_topics(question_topics: list[dict]) -> bool:
+    """Question stems in imported exams often share one generic topic label."""
+    names = {(row.get("topic") or "").strip().lower() for row in question_topics}
+    names.discard("")
+    return len(names) < 2 or names <= _GENERIC_TOPICS
+
+
+def _curriculum_label(code: str | None, name: str | None) -> str:
+    code = (code or "").strip()
+    name = (name or "").strip()
+    if code and name and code not in name:
+        return f"{code} · {name}"
+    return name or code or "Curriculum"
+
+
+async def _question_topics(db: asyncpg.Connection, student_id: str) -> list[dict]:
+    rows = await db.fetch(
+        """
+        SELECT q.topic, ROUND(100.0 * AVG(ans.is_correct::int), 1)::float AS score
+        FROM attempt_answers ans
+        JOIN questions q ON q.id = ans.question_id
+        JOIN exam_attempts a ON a.id = ans.attempt_id
+        WHERE a.student_id = $1
+        GROUP BY q.topic
+        ORDER BY 2 DESC
+        """,
+        student_id,
+    )
+    return [{"topic": r["topic"], "score": float(r["score"])} for r in rows]
+
+
+async def _curriculum_topics(db: asyncpg.Connection, student_id: str) -> list[dict]:
+    rows = await db.fetch(
+        """
+        SELECT c.code, c.name, ROUND(AVG(a.score)::numeric, 1)::float AS score
+        FROM v_exam_attempts a
+        JOIN courses c ON c.id = a.course_id
+        WHERE a.student_id = $1 AND a.participated
+        GROUP BY c.code, c.name
+        ORDER BY 3 DESC, c.code
+        """,
+        student_id,
+    )
+    return [
+        {
+            "topic": _curriculum_label(r["code"], r["name"]),
+            "score": float(r["score"]),
+        }
+        for r in rows
+    ]
+
+
+async def _topics_for_student(db: asyncpg.Connection, student_id: str) -> list[dict]:
+    question_topics = await _question_topics(db, student_id)
+    curriculum_topics = await _curriculum_topics(db, student_id)
+    if use_curriculum_topics(question_topics) and curriculum_topics:
+        return curriculum_topics
+    return question_topics or curriculum_topics
+
 
 async def get_student_dashboard(
     ctx: UserContext,
@@ -75,21 +137,13 @@ async def get_student_dashboard(
     average = round1(avg(student_scores))
     class_average = round1(avg(class_scores))
 
-    topic_rows = await db.fetch(
-        """
-        SELECT q.topic, ROUND(100.0 * AVG(ans.is_correct::int), 1)::float AS score
-        FROM attempt_answers ans
-        JOIN questions q ON q.id = ans.question_id
-        JOIN exam_attempts a ON a.id = ans.attempt_id
-        WHERE a.student_id = $1
-        GROUP BY q.topic
-        ORDER BY 2 DESC
-        """,
-        student["id"],
-    )
-    topics = [{"topic": r["topic"], "score": float(r["score"])} for r in topic_rows]
+    topics = await _topics_for_student(db, student["id"])
     best_topic = topics[0]["topic"] if topics else "None"
-    weakest_topic = topics[-1]["topic"] if topics else "None"
+    weakest_topic = (
+        topics[-1]["topic"]
+        if len(topics) > 1
+        else (topics[0]["topic"] if topics else "None")
+    )
 
     return {
         "studentName": student["name"],
@@ -172,19 +226,7 @@ async def get_student_profile(
     gpa = transcript["gpa"]
     standing = transcript["standing"] or standing_from_gpa(gpa, overall)
 
-    topic_rows = await db.fetch(
-        """
-        SELECT q.topic, ROUND(100.0 * AVG(ans.is_correct::int), 1)::float AS score
-        FROM attempt_answers ans
-        JOIN questions q ON q.id = ans.question_id
-        JOIN exam_attempts a ON a.id = ans.attempt_id
-        WHERE a.student_id = $1
-        GROUP BY q.topic
-        ORDER BY 2 DESC
-        """,
-        student_id,
-    )
-    topics = [{"topic": r["topic"], "score": float(r["score"])} for r in topic_rows]
+    topics = await _topics_for_student(db, student_id)
     if not topics:
         topics = [{"topic": "General", "score": overall}]
 

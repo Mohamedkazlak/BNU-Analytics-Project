@@ -220,7 +220,7 @@ def test_fresh_schema_curriculum_is_text_college(fresh_db):
         )
     )
     assert [r["v"] for r in rows] == ["college"]
-    assert "org_unit_is_visible" in _policy_qual(
+    assert "current_visible_org_unit_ids" in _policy_qual(
         fresh_db, "org_units", "org_units_read"
     )
     tables = asyncio.run(
@@ -239,10 +239,10 @@ def test_migrated_schema_matches_fresh_curriculum_and_org_policy(fresh_db, migra
     assert _column_udt(migrated_db, "courses", "requirement_level_type") == "text"
     assert _column_udt(migrated_db, "courses", "counted_in_cumulative_gpa") == "bool"
     assert _column_udt(migrated_db, "courses", "pass_fail_subject") == "bool"
-    assert "org_unit_is_visible" in _policy_qual(
+    assert "current_visible_org_unit_ids" in _policy_qual(
         migrated_db, "org_units", "org_units_read"
     )
-    assert "org_unit_is_visible" in _policy_qual(
+    assert "current_visible_org_unit_ids" in _policy_qual(
         fresh_db, "org_units", "org_units_read"
     )
     versions = asyncio.run(
@@ -262,6 +262,10 @@ def test_migrated_schema_matches_fresh_curriculum_and_org_policy(fresh_db, migra
         "008",
         "009",
         "010",
+        "011",
+        "012",
+        "013",
+        "014",
     ]
     sector_col = asyncio.run(
         _fetch(
@@ -300,6 +304,21 @@ def test_migration_runner_skips_already_applied(migrated_db):
         "skip 009_disable_schema_migrations_rls.sql (already applied)" in runner.stdout
     )
     assert "skip 010_syn_transc_marker_backfill.sql (already applied)" in runner.stdout
+    assert (
+        "skip 011_link_demo_student_to_imported_cs.sql (already applied)"
+        in runner.stdout
+    )
+    assert (
+        "skip 012_set_updated_at_search_path_and_fk_indexes.sql (already applied)"
+        in runner.stdout
+    )
+    assert (
+        "skip 013_rls_initplan_visibility_sets.sql (already applied)" in runner.stdout
+    )
+    assert (
+        "skip 014_exam_attempts_enrollment_student_fk.sql (already applied)"
+        in runner.stdout
+    )
     assert not any(line.startswith("applied ") for line in runner.stdout.splitlines())
 
 
@@ -552,7 +571,11 @@ def test_migration_010_backfills_unmarked_syn_transc_via_runner():
           ('006', '006_synthetic_item_answers.sql'),
           ('007', '007_org_unit_rls_and_helpers.sql'),
           ('008', '008_revoke_anon_execute_on_helpers.sql'),
-          ('009', '009_disable_schema_migrations_rls.sql');
+          ('009', '009_disable_schema_migrations_rls.sql'),
+          ('011', '011_link_demo_student_to_imported_cs.sql'),
+          ('012', '012_set_updated_at_search_path_and_fk_indexes.sql'),
+          ('013', '013_rls_initplan_visibility_sets.sql'),
+          ('014', '014_exam_attempts_enrollment_student_fk.sql');
         """,
     )
     if setup.returncode != 0:
@@ -621,8 +644,12 @@ def test_migration_010_backfills_unmarked_syn_transc_via_runner():
         "008",
         "009",
         "010",
+        "011",
+        "012",
+        "013",
+        "014",
     ]
-    assert recorded[-1]["filename"] == "010_syn_transc_marker_backfill.sql"
+    assert recorded[-1]["filename"] == "014_exam_attempts_enrollment_student_fk.sql"
 
     _apply_file(url, ROOT / "db" / "migrations" / "010_syn_transc_marker_backfill.sql")
     reapplied = asyncio.run(
