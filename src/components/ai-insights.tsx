@@ -13,16 +13,16 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
-import { aiConfig } from "@/lib/ai-config";
+import { aiConfig } from "@/lib/ai/config";
 import {
   getAiDecision,
   type Insight,
   type Prediction,
   type RiskCase,
-} from "@/lib/ai-insights";
-import type { Recommendation } from "@/lib/ai-recommendations";
+} from "@/lib/ai/insights";
+import type { Recommendation } from "@/lib/ai/recommendations";
 import { useRole } from "./role-context";
-import { useFilteredQuery } from "@/hooks/use-analytics-filters";
+import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
 
 const EMPTY_COPY =
   "Not enough data yet to generate insights — check back after your next exam.";

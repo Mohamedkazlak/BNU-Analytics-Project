@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { getRealTimeStruggling } from "@/lib/api";
 import { AiDecisionSection } from "@/components/ai-insights";
-import { ScopeBanner } from "@/components/scope-banner";
+import { ScopeBanner } from "@/components/dashboard/scope-banner";
 import { useRole } from "@/components/role-context";
 import {
   AiInsight,
@@ -17,11 +17,11 @@ import {
   FilterBar,
   Select,
   SearchInput,
-} from "@/components/dashboard-ui";
+} from "@/components/dashboard/dashboard-ui";
 import type { StrugglingStudent } from "@/lib/types";
-import { FiltersRequiredNotice } from "@/components/analytics-filters";
-import { useFilteredQuery } from "@/hooks/use-analytics-filters";
-import { roleGuard } from "@/lib/role-guards";
+import { FiltersRequiredNotice } from "@/components/dashboard/analytics-filters";
+import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
+import { roleGuard } from "@/lib/auth/role-guards";
 
 export const Route = createFileRoute("/real-time")({
   beforeLoad: roleGuard("/real-time"),

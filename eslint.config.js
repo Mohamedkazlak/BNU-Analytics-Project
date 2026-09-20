@@ -7,14 +7,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: [
-      "dist",
-      ".output",
-      ".vinxi",
-      "backend/**",
-      "vitest.config.ts",
-      "src/components/ui/**",
-    ],
+    ignores: ["dist", ".output", ".vinxi", "backend/**", "vitest.config.ts"],
   },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],

@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { roleRoutes, getActiveDemoRole } from "../lib/role-guards";
-import { setAuthToken } from "../lib/auth-token";
-import { BACKEND_URL } from "../lib/api";
+import { roleRoutes, getActiveDemoRole } from "@/lib/auth/role-guards";
+import { setAuthToken } from "@/lib/auth/token";
+import { BACKEND_URL } from "@/lib/api";
 
 const DEMO_ACCOUNTS = [
   {

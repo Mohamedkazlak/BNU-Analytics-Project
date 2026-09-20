@@ -29,10 +29,10 @@ import {
   Th,
   chartColors,
   tooltipStyle,
-} from "@/components/dashboard-ui";
-import { FiltersRequiredNotice } from "@/components/analytics-filters";
-import { useFilteredQuery } from "@/hooks/use-analytics-filters";
-import { roleGuard } from "@/lib/role-guards";
+} from "@/components/dashboard/dashboard-ui";
+import { FiltersRequiredNotice } from "@/components/dashboard/analytics-filters";
+import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
+import { roleGuard } from "@/lib/auth/role-guards";
 
 export const Route = createFileRoute("/students/$studentId")({
   beforeLoad: roleGuard("/students"),

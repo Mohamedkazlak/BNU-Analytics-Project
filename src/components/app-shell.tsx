@@ -4,9 +4,9 @@ import { cn } from "@/lib/utils";
 import { ChatPanel } from "./chat-panel";
 import { navByRole, roleHome, useRole } from "./role-context";
 import type { UserAffiliation } from "@/lib/types";
-import { clearAuthToken } from "@/lib/auth-token";
-import { rolesAllowedForPath } from "@/lib/role-guards";
-import { AnalyticsFilters } from "@/components/analytics-filters";
+import { clearAuthToken } from "@/lib/auth/token";
+import { rolesAllowedForPath } from "@/lib/auth/role-guards";
+import { AnalyticsFilters } from "@/components/dashboard/analytics-filters";
 
 const BRAND_LOGO = "/brand-logo.png";
 

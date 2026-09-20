@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { getActiveDemoRole, roleGuard, roleHome } from "@/lib/role-guards";
+import { getActiveDemoRole, roleGuard, roleHome } from "@/lib/auth/role-guards";
 
 export const Route = createFileRoute("/")({
   beforeLoad: () => {

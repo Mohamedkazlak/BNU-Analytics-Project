@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { OverviewDashboard } from "@/components/overview-dashboard";
-import { roleGuard } from "@/lib/role-guards";
+import { OverviewDashboard } from "@/components/dashboard/overview-dashboard";
+import { roleGuard } from "@/lib/auth/role-guards";
 import { useRole } from "@/components/role-context";
 
 export const Route = createFileRoute("/management")({

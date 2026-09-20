@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
-import { askAssistant } from "@/lib/assistant.functions";
+import { askAssistant } from "@/lib/ai/assistant";
 import { subscribeToChatOpen } from "@/lib/chat-bus";
 import { useRole } from "./role-context";
 

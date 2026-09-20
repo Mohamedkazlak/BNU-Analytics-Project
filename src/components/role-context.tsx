@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { DemoUser, Role, UserAffiliation, ViewerScope } from "@/lib/types";
-import { roleHome } from "@/lib/role-guards";
+import { roleHome } from "@/lib/auth/role-guards";
 import { useRouterState } from "@tanstack/react-router";
 import {
   getAuthToken,
@@ -16,7 +16,7 @@ import {
   scopeIdFromToken,
   studentIdFromToken,
   userIdFromToken,
-} from "@/lib/auth-token";
+} from "@/lib/auth/token";
 import { getMe, type MeResponse } from "@/lib/api";
 
 export interface NavItem {

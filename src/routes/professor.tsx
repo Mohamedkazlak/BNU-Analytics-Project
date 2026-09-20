@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AiDecisionSection } from "@/components/ai-insights";
-import { ScopeBanner } from "@/components/scope-banner";
-import { FiltersRequiredNotice } from "@/components/analytics-filters";
+import { ScopeBanner } from "@/components/dashboard/scope-banner";
+import { FiltersRequiredNotice } from "@/components/dashboard/analytics-filters";
 import { getStudentPerformance } from "@/lib/api";
 import {
   Badge,
@@ -12,10 +12,10 @@ import {
   StatBlock,
   TableShell,
   Th,
-} from "@/components/dashboard-ui";
-import { roleGuard } from "@/lib/role-guards";
+} from "@/components/dashboard/dashboard-ui";
+import { roleGuard } from "@/lib/auth/role-guards";
 import { useRole } from "@/components/role-context";
-import { useFilteredQuery } from "@/hooks/use-analytics-filters";
+import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
 
 export const Route = createFileRoute("/professor")({
   beforeLoad: roleGuard("/professor"),

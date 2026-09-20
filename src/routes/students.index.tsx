@@ -16,11 +16,11 @@ import {
   StatBlock,
   TableShell,
   Th,
-} from "@/components/dashboard-ui";
-import { FiltersRequiredNotice } from "@/components/analytics-filters";
-import { useFilteredQuery } from "@/hooks/use-analytics-filters";
-import { ScopeBanner } from "@/components/scope-banner";
-import { roleGuard } from "@/lib/role-guards";
+} from "@/components/dashboard/dashboard-ui";
+import { FiltersRequiredNotice } from "@/components/dashboard/analytics-filters";
+import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
+import { ScopeBanner } from "@/components/dashboard/scope-banner";
+import { roleGuard } from "@/lib/auth/role-guards";
 
 export const Route = createFileRoute("/students/")({
   beforeLoad: roleGuard("/students"),
@@ -47,9 +47,8 @@ export const Route = createFileRoute("/students/")({
 
 /**
  * PERMISSION GATE — runs before any student record is requested.
- * Only Senior Management and Faculty may read named student records
- * ("named_students" domain in src/lib/ai-scope.ts). In production the same
- * check runs inside the server function and in the row-level policy.
+ * Only Senior Management and Faculty may read named student records.
+ * The same check runs in FastAPI and in the row-level policy.
  */
 function StudentDirectory() {
   const { role } = useRole();
