@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AnalyticsFilters(BaseModel):
@@ -10,6 +10,7 @@ class AnalyticsFilters(BaseModel):
     college_id: Optional[str] = None
     curriculum_id: Optional[str] = None
     student_id: Optional[str] = None
+    professor_id: Optional[str] = None
 
     @classmethod
     def from_query(
@@ -18,6 +19,7 @@ class AnalyticsFilters(BaseModel):
         college_id: Optional[str] = None,
         curriculum_id: Optional[str] = None,
         student_id: Optional[str] = None,
+        professor_id: Optional[str] = None,
     ) -> "AnalyticsFilters":
         def clean(value: Optional[str]) -> Optional[str]:
             if value is None:
@@ -30,6 +32,7 @@ class AnalyticsFilters(BaseModel):
             college_id=clean(college_id),
             curriculum_id=clean(curriculum_id),
             student_id=clean(student_id),
+            professor_id=clean(professor_id),
         )
 
 
@@ -61,6 +64,7 @@ class FilterOptionsResponse(BaseModel):
     sectors: List[FilterOption]
     colleges: List[FilterOption]
     curricula: List[CurriculumOption]
+    professors: List[FilterOption] = Field(default_factory=list)
     students: List[StudentOption]
     hasMoreStudents: bool = False
     studentPageSize: int = 150
@@ -72,8 +76,13 @@ class AiDecisionRequest(BaseModel):
     collegeId: Optional[str] = None
     curriculumId: Optional[str] = None
     studentId: Optional[str] = None
+    professorId: Optional[str] = None
 
     def to_filters(self) -> AnalyticsFilters:
         return AnalyticsFilters.from_query(
-            self.sectorId, self.collegeId, self.curriculumId, self.studentId
+            self.sectorId,
+            self.collegeId,
+            self.curriculumId,
+            self.studentId,
+            self.professorId,
         )

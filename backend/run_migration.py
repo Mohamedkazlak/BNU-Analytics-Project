@@ -136,7 +136,26 @@ async def apply_migrations(database_url: str, migrations_dir: Path) -> list[str]
     return log
 
 
+def _load_env_files() -> None:
+    """Same files as core.config, without importing the app (script path)."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    backend_dir = Path(__file__).resolve().parent
+    load_dotenv(
+        backend_dir / ".env", override=False, interpolate=False, encoding="utf-8"
+    )
+    load_dotenv(
+        backend_dir.parent / ".env",
+        override=False,
+        interpolate=False,
+        encoding="utf-8",
+    )
+
+
 async def main() -> None:
+    _load_env_files()
     database_url = os.getenv("DATABASE_ADMIN_URL") or os.getenv("DATABASE_URL")
     if not database_url:
         print("DATABASE_URL or DATABASE_ADMIN_URL is required", file=sys.stderr)

@@ -35,6 +35,7 @@ async def get_filter_options(
     sectors: list[FilterOption] = []
     colleges: list[FilterOption] = []
     curricula: list[CurriculumOption] = []
+    professors: list[FilterOption] = []
     students: list[StudentOption] = []
     has_more_students = False
 
@@ -65,12 +66,14 @@ async def get_filter_options(
                 sector_id,
             )
             colleges = [
-                FilterOption(id=r["id"], name=r["name"], parentId=r["parent_id"]) for r in rows
+                FilterOption(id=r["id"], name=r["name"], parentId=r["parent_id"])
+                for r in rows
             ]
 
     if "curriculum" in visible:
         college_id = filters.college_id or scope.college_id
         sector_id = filters.sector_id or scope.sector_id
+        professor_id = filters.professor_id
         if scope.role == "professor":
             rows = await db.fetch(
                 """
@@ -88,9 +91,17 @@ async def get_filter_options(
                 SELECT c.id, c.code, c.name, c.program_id
                 FROM courses c
                 WHERE c.program_id = $1
+                  AND (
+                    $2::text IS NULL
+                    OR EXISTS (
+                      SELECT 1 FROM staff_course_assignments sca
+                      WHERE sca.course_id = c.id AND sca.staff_person_id = $2
+                    )
+                  )
                 ORDER BY c.code
                 """,
                 college_id,
+                professor_id,
             )
         elif sector_id and scope.role in ("senior_management", "it_academic_integrity"):
             rows = await db.fetch(
@@ -99,25 +110,60 @@ async def get_filter_options(
                 FROM courses c
                 JOIN org_units p ON p.id = c.program_id
                 WHERE p.parent_id = $1
+                  AND (
+                    $2::text IS NULL
+                    OR EXISTS (
+                      SELECT 1 FROM staff_course_assignments sca
+                      WHERE sca.course_id = c.id AND sca.staff_person_id = $2
+                    )
+                  )
                 ORDER BY c.code
                 """,
                 sector_id,
+                professor_id,
             )
         else:
             rows = []
         curricula = [
-            CurriculumOption(id=r["id"], code=r["code"], name=r["name"], collegeId=r["program_id"])
+            CurriculumOption(
+                id=r["id"], code=r["code"], name=r["name"], collegeId=r["program_id"]
+            )
             for r in rows
         ]
+
+    if "professor" in visible:
+        college_id = filters.college_id or scope.college_id
+        sector_id = filters.sector_id or scope.sector_id
+        rows = await db.fetch(
+            """
+            SELECT DISTINCT pe.id, pe.full_name AS name
+            FROM staff_course_assignments sca
+            JOIN people pe ON pe.id = sca.staff_person_id
+            JOIN courses c ON c.id = sca.course_id
+            JOIN org_units p ON p.id = c.program_id
+            WHERE ($1::text IS NULL OR p.parent_id = $1)
+              AND ($2::text IS NULL OR c.program_id = $2)
+              AND ($3::text IS NULL OR c.id = $3)
+            ORDER BY pe.full_name
+            """,
+            sector_id,
+            college_id,
+            filters.curriculum_id,
+        )
+        professors = [FilterOption(id=r["id"], name=r["name"]) for r in rows]
 
     load_students = "student" in visible and (
         scope.role == "professor"
         or filters.curriculum_id
         or filters.college_id
         or scope.college_id
+        or filters.professor_id
     )
     if load_students:
         fetch_limit = STUDENT_PAGE_SIZE + 1
+        professor_id = (
+            scope.person_id if scope.role == "professor" else filters.professor_id
+        )
         if scope.role == "professor":
             rows = await db.fetch(
                 f"""
@@ -170,19 +216,33 @@ async def get_filter_options(
                 LEFT JOIN course_offerings o ON o.id = e.offering_id
                 WHERE ($1::text IS NULL OR s.program_id = $1)
                   AND ($2::text IS NULL OR o.course_id = $2)
-                  {_student_search_clause("pe", 3)}
+                  AND (
+                    $3::text IS NULL
+                    OR EXISTS (
+                      SELECT 1
+                      FROM enrollments e2
+                      JOIN course_offerings o2 ON o2.id = e2.offering_id
+                      JOIN staff_course_assignments sca
+                        ON sca.course_id = o2.course_id
+                       AND sca.staff_person_id = $3
+                      WHERE e2.student_id = s.id
+                    )
+                  )
+                  {_student_search_clause("pe", 4)}
                 ORDER BY pe.full_name
-                LIMIT $4
+                LIMIT $5
                 """,
                 college_id,
                 filters.curriculum_id,
+                professor_id,
                 query,
                 fetch_limit,
             )
         has_more_students = len(rows) > STUDENT_PAGE_SIZE
         rows = rows[:STUDENT_PAGE_SIZE]
         students = [
-            StudentOption(id=r["id"], name=r["name"], collegeId=r["program_id"]) for r in rows
+            StudentOption(id=r["id"], name=r["name"], collegeId=r["program_id"])
+            for r in rows
         ]
 
     contains_synthetic = bool(
@@ -198,6 +258,7 @@ async def get_filter_options(
         sectors=sectors,
         colleges=colleges,
         curricula=curricula,
+        professors=professors,
         students=students,
         hasMoreStudents=has_more_students,
         studentPageSize=STUDENT_PAGE_SIZE,

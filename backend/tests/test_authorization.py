@@ -127,6 +127,33 @@ def test_professor_assigned_course_non_enrolled_student_denied():
     asyncio.run(run())
 
 
+def test_professor_outside_selected_college_is_denied():
+    async def run():
+        db = AsyncMock()
+        db.fetchrow = AsyncMock(
+            side_effect=[
+                {"id": "sec-a", "level": "sector"},
+                {"id": "col-a", "level": "program", "parent_id": "sec-a"},
+                {"id": "p-foreign"},
+                None,
+            ]
+        )
+        scope = make_scope()
+        with pytest.raises(HTTPException) as exc:
+            await _assert_hierarchy(
+                db,
+                scope,
+                AnalyticsFilters(
+                    sector_id="sec-a",
+                    college_id="col-a",
+                    professor_id="p-foreign",
+                ),
+            )
+        assert exc.value.status_code == 403
+
+    asyncio.run(run())
+
+
 def test_professor_unassigned_course_enrolled_student_denied():
     async def run():
         db = AsyncMock()

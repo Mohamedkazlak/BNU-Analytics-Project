@@ -1,6 +1,7 @@
 import { FilterBar, Select } from "@/components/dashboard/dashboard-ui";
 import { useAnalyticsFilters } from "@/components/dashboard/use-analytics-filters";
 import { useRole } from "@/components/role-context";
+import { defaultVisible } from "@/lib/filter-types";
 
 export function AnalyticsFilters() {
   const { role, viewer } = useRole();
@@ -10,6 +11,7 @@ export function AnalyticsFilters() {
     setSectorId,
     setCollegeId,
     setCurriculumId,
+    setProfessorId,
     setStudentId,
     studentQuery,
     setStudentQuery,
@@ -19,14 +21,11 @@ export function AnalyticsFilters() {
   if (role === "student") return null;
 
   const visible = options?.visible ?? defaultVisible(role, viewer.level);
-  const required =
-    options?.required ??
-    (role === "senior_management" && viewer.level === "university"
-      ? ["sectorId", "collegeId"]
-      : []);
+  const required = options?.required ?? [];
   const showSector = visible.includes("sector");
   const showCollege = visible.includes("college");
   const showCurriculum = visible.includes("curriculum");
+  const showProfessor = visible.includes("professor");
   const showStudent = visible.includes("student");
 
   const sectorOptions = [
@@ -42,6 +41,13 @@ export function AnalyticsFilters() {
       label: required.includes("collegeId") ? "Select college" : "All colleges",
     },
     ...(options?.colleges ?? []).map((s) => ({ value: s.id, label: s.name })),
+  ];
+  const professorOptions = [
+    { value: "", label: "All professors" },
+    ...(options?.professors ?? []).map((p) => ({
+      value: p.id,
+      label: p.name,
+    })),
   ];
   const curriculumOptions = [
     { value: "", label: "All curricula" },
@@ -72,6 +78,14 @@ export function AnalyticsFilters() {
             value={filters.collegeId ?? ""}
             options={collegeOptions}
             onChange={setCollegeId}
+          />
+        ) : null}
+        {showProfessor ? (
+          <Select
+            label="Professor"
+            value={filters.professorId ?? ""}
+            options={professorOptions}
+            onChange={setProfessorId}
           />
         ) : null}
         {showCurriculum ? (
@@ -112,30 +126,17 @@ export function AnalyticsFilters() {
       ) : null}
       {!filtersReady ? (
         <p className="text-[12px] text-ink-soft">
-          Select a sector and college to load analytics for that scope.
+          Select the required filters to load analytics for that scope.
         </p>
       ) : null}
     </div>
   );
 }
 
-export function defaultVisible(
-  role: string,
-  scopeLevel?: string | null,
-): string[] {
-  if (role === "professor") return ["student"];
-  if (role === "program_director" || role === "academic_affairs")
-    return ["curriculum", "student"];
-  if (role === "student") return [];
-  if (role === "senior_management" && scopeLevel === "sector")
-    return ["college", "curriculum", "student"];
-  return ["sector", "college", "curriculum", "student"];
-}
-
 export function FiltersRequiredNotice() {
   return (
     <div className="rounded-2xl border border-iris/20 bg-iris/8 px-4 py-3 text-[13px] text-ink-soft">
-      Select a sector and college to load analytics for that scope.
+      Select the required filters to load analytics for that scope.
     </div>
   );
 }

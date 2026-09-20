@@ -20,14 +20,13 @@ async def get_real_time_struggling(
         f"""
         SELECT
             a.student_id,
-            s.name,
+            a.student_name AS name,
             (ARRAY_AGG(a.course_code ORDER BY a.started_at DESC NULLS LAST))[1] AS course,
             (ARRAY_AGG(a.score ORDER BY a.started_at DESC NULLS LAST))[1]::float AS last_score,
             AVG(a.score)::float AS average
         FROM v_exam_attempts a
-        JOIN v_students s ON s.id = a.student_id
         WHERE a.participated AND a.score IS NOT NULL AND {where_sql}
-        GROUP BY a.student_id, s.name
+        GROUP BY a.student_id, a.student_name
         ORDER BY (ARRAY_AGG(a.score ORDER BY a.started_at DESC NULLS LAST))[1]
         LIMIT 12
         """,

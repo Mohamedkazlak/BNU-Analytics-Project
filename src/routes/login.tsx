@@ -4,62 +4,144 @@ import { roleRoutes, getActiveDemoRole } from "@/lib/auth/role-guards";
 import { setAuthToken } from "@/lib/auth/token";
 import { BACKEND_URL } from "@/lib/api";
 
-const DEMO_ACCOUNTS = [
+const DEMO_ACCOUNT_GROUPS = [
   {
-    id: "u-president",
-    title: "University President",
-    route: "/management",
+    heading: "Senior management",
     badge: "bg-blue-50 text-blue-700 ring-blue-700/10",
-    description: "Sees everything about everyone",
+    route: "/management",
+    accounts: [
+      { id: "u-president", title: "President", name: "Prof. Dr. Tamer Samir" },
+      {
+        id: "u-vp-aa",
+        title: "Vice President for Academic Affairs",
+        name: "Prof. Dr. Hussein Mahmoud",
+      },
+      {
+        id: "u-dean-eng",
+        title: "Engineering Sector Dean",
+        name: "Dr. Hana El-Masry",
+      },
+      {
+        id: "u-dean-health",
+        title: "Health Sector Dean",
+        name: "Prof. Dr. Nadia El-Sherif",
+      },
+      {
+        id: "u-dean-hum",
+        title: "Literature Sector Dean",
+        name: "Prof. Dr. Khaled Mansour",
+      },
+    ],
   },
   {
-    id: "u-vp-aa",
-    title: "VP for Academic Affairs",
-    route: "/management",
-    badge: "bg-blue-50 text-blue-700 ring-blue-700/10",
-    description: "Sees everything about everyone",
-  },
-  {
-    id: "u-dean-eng",
-    title: "Sector Dean",
-    route: "/management",
-    badge: "bg-blue-50 text-blue-700 ring-blue-700/10",
-    description: "Sees everything about colleges he supervises",
-  },
-  {
-    id: "u-pd-cs",
-    title: "Program Director",
-    route: "/program-director",
+    heading: "Program directors",
     badge: "bg-indigo-50 text-indigo-700 ring-indigo-700/10",
-    description: "Sees everything about his college",
+    route: "/program-director",
+    accounts: [
+      {
+        id: "u-pd-cs",
+        title: "Computer Science",
+        name: "Prof. Dr. Eman Abdel-elghaffar",
+      },
+      {
+        id: "u-pd-ene",
+        title: "Energy Sciences",
+        name: "Prof. Dr. Mohamed Mostafa",
+      },
+      {
+        id: "u-pd-eng",
+        title: "Engineering",
+        name: "Prof. Dr. Mahmoud El-Toukhy",
+      },
+      { id: "u-pd-med", title: "Medicine", name: "Prof. Dr. Ashraf Ismail" },
+      { id: "u-pd-den", title: "Dentistry", name: "Prof. Dr. Heba Mahmoud" },
+      {
+        id: "u-pd-pt",
+        title: "Physical Therapy",
+        name: "Prof. Dr. Asmaa Mahmoud",
+      },
+      { id: "u-pd-vet", title: "Veterinary", name: "Prof. Dr. Ahmed Hassan" },
+      {
+        id: "u-pd-art",
+        title: "Visual Arts & Design",
+        name: "Prof. Dr. Ghada Mohamed",
+      },
+      {
+        id: "u-pd-eco",
+        title: "Economics and Business Administration",
+        name: "Prof. Dr. Doaa Aakl",
+      },
+    ],
   },
   {
-    id: "u-aa-cs",
-    title: "Academic Affairs",
-    route: "/academic-affairs",
+    heading: "Academic affairs",
     badge: "bg-purple-50 text-purple-700 ring-purple-700/10",
-    description: "Sees everything about students of his college",
+    route: "/academic-affairs",
+    accounts: [
+      { id: "u-aa-cs", title: "Computer Science", name: "Sara Mansour" },
+      { id: "u-aa-ene", title: "Energy Sciences", name: "Dina Farouk" },
+      { id: "u-aa-eng", title: "Engineering", name: "Omar Khalil" },
+      { id: "u-aa-med", title: "Medicine", name: "Rania Hassan" },
+      { id: "u-aa-den", title: "Dentistry", name: "Mostafa Adel" },
+      { id: "u-aa-pt", title: "Physical Therapy", name: "Nourhan Saleh" },
+      { id: "u-aa-vet", title: "Veterinary", name: "Hossam Ali" },
+      { id: "u-aa-art", title: "Visual Arts & Design", name: "Laila Magdy" },
+      {
+        id: "u-aa-eco",
+        title: "Economics and Business Administration",
+        name: "Yasmine Fathy",
+      },
+    ],
   },
   {
-    id: "u-prof-cs",
-    title: "Professor",
-    route: "/professor",
+    heading: "Professors",
     badge: "bg-pink-50 text-pink-700 ring-pink-700/10",
-    description: "Sees everything about his curriculums",
+    route: "/professor",
+    accounts: [
+      {
+        id: "u-prof-cs",
+        title: "Computer Science",
+        name: "Prof. Tomas Oyelaran",
+      },
+      {
+        id: "u-prof-ene",
+        title: "Energy Sciences",
+        name: "Prof. Yasser Mansour",
+      },
+      { id: "u-prof-eng", title: "Engineering", name: "Dr. Hana El-Masry" },
+      { id: "u-prof-med", title: "Medicine", name: "Dr. Yasmin Adel" },
+      { id: "u-prof-den", title: "Dentistry", name: "Prof. Walid Naguib" },
+      { id: "u-prof-pt", title: "Physical Therapy", name: "Dr. Amira Saleh" },
+      { id: "u-prof-vet", title: "Veterinary", name: "Prof. Nabil Youssef" },
+      {
+        id: "u-prof-art",
+        title: "Visual Arts & Design",
+        name: "Prof. Lina Haddad",
+      },
+      {
+        id: "u-prof-eco",
+        title: "Economics and Business Administration",
+        name: "Dr. Nour El-Sayed",
+      },
+    ],
   },
   {
-    id: "u-it-integrity",
-    title: "IT / Academic Integrity",
-    route: "/integrity",
+    heading: "University offices",
     badge: "bg-red-50 text-red-700 ring-red-700/10",
-    description: "Sees live exam monitoring & flagged cases",
+    route: "/integrity",
+    accounts: [
+      {
+        id: "u-it-integrity",
+        title: "Academic Integrity",
+        name: "Layla Nasser",
+      },
+    ],
   },
   {
-    id: "u-student",
-    title: "Student",
-    route: "/my-progress",
+    heading: "Student",
     badge: "bg-green-50 text-green-700 ring-green-700/10",
-    description: "Sees his own performance & recommendations",
+    route: "/my-progress",
+    accounts: [{ id: "u-student", title: "Student", name: "Student account" }],
   },
 ] as const;
 
@@ -184,25 +266,36 @@ function Login() {
             <h3 className="mb-3 text-sm font-medium text-gray-900">
               Demo Accounts
             </h3>
-            <div className="space-y-2 text-xs text-gray-600">
-              {DEMO_ACCOUNTS.map((account) => (
-                <div
-                  key={account.id}
-                  className="flex items-start justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <span className="font-semibold text-gray-900">
-                      {account.id}
-                    </span>
-                    <p>{account.title}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
+            <div className="space-y-4 text-xs text-gray-600">
+              {DEMO_ACCOUNT_GROUPS.map((group) => (
+                <div key={group.heading}>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="font-semibold text-gray-900">
+                      {group.heading}
+                    </p>
                     <span
-                      className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${account.badge}`}
+                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${group.badge}`}
                     >
-                      {account.route}
+                      {group.route}
                     </span>
-                    <p className="mt-1 text-gray-500">{account.description}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {group.accounts.map((account) => (
+                      <div
+                        key={account.id}
+                        className="flex items-start justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-semibold text-gray-900">
+                            {account.id}
+                          </span>
+                          <p>{account.name}</p>
+                        </div>
+                        <p className="shrink-0 text-right text-gray-500">
+                          {account.title}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}

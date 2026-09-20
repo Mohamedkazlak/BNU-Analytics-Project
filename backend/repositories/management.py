@@ -1,6 +1,6 @@
 import asyncpg
 
-from core.utils import PASS_MARK, round1
+from core.utils import PASS_MARK
 from repositories.sql_filters import attempt_where
 from schemas.auth import UserContext
 from schemas.filters import AnalyticsFilters
@@ -14,23 +14,33 @@ async def get_management_overview(
     filters = filters or AnalyticsFilters()
     where_sql, args, _ = attempt_where(filters)
 
-    stats = await db.fetchrow(
+    grain_rows = await db.fetch(
         f"""
         SELECT
+            grouping(a.course_code) AS g_course,
+            grouping(a.program) AS g_program,
+            a.course_code AS course,
+            a.program AS college,
             COUNT(*) AS total_attempts,
-            COUNT(*) FILTER (WHERE status <> 'absent') AS taken_attempts,
-            COUNT(*) FILTER (WHERE status <> 'absent' AND score >= {PASS_MARK}) AS passed_attempts,
-            COUNT(DISTINCT exam_id) AS total_exams
+            COUNT(*) FILTER (WHERE a.status <> 'absent') AS taken_attempts,
+            COUNT(*) FILTER (WHERE a.status <> 'absent' AND a.score >= {PASS_MARK}) AS passed_attempts,
+            COUNT(DISTINCT a.exam_id) AS total_exams,
+            COUNT(DISTINCT a.course_id) AS courses
         FROM v_exam_attempts a
         WHERE {where_sql}
+        GROUP BY GROUPING SETS ((a.course_code), (a.program), ())
         """,
         *args,
     )
 
-    taken_attempts = stats["taken_attempts"] or 0
-    total_attempts = stats["total_attempts"] or 0
-    passed_attempts = stats["passed_attempts"] or 0
-    total_exams = stats["total_exams"] or 0
+    stats = next(
+        (r for r in grain_rows if r["g_course"] == 1 and r["g_program"] == 1),
+        None,
+    )
+    taken_attempts = (stats["taken_attempts"] if stats else 0) or 0
+    total_attempts = (stats["total_attempts"] if stats else 0) or 0
+    passed_attempts = (stats["passed_attempts"] if stats else 0) or 0
+    total_exams = (stats["total_exams"] if stats else 0) or 0
     pass_rate = (passed_attempts / taken_attempts * 100) if taken_attempts else 0
     completion = (taken_attempts / total_attempts * 100) if total_attempts else 0
 
@@ -41,48 +51,34 @@ async def get_management_overview(
         {"label": "Completion rate", "value": f"{completion:.1f}%"},
     ]
 
-    course_rows = await db.fetch(
-        f"""
-        SELECT
-            course_code AS course,
-            COUNT(*) FILTER (WHERE status <> 'absent' AND score >= {PASS_MARK}) AS passed,
-            COUNT(*) FILTER (WHERE status <> 'absent') AS participants
-        FROM v_exam_attempts a
-        WHERE {where_sql}
-        GROUP BY course_code
-        """,
-        *args,
-    )
     pass_rate_by_course = [
         {
             "course": r["course"],
-            "passRate": round((r["passed"] / r["participants"] * 100) if r["participants"] else 0, 1),
-            "participants": r["participants"],
+            "passRate": round(
+                (r["passed_attempts"] / r["taken_attempts"] * 100)
+                if r["taken_attempts"]
+                else 0,
+                1,
+            ),
+            "participants": r["taken_attempts"],
         }
-        for r in course_rows
+        for r in grain_rows
+        if r["g_course"] == 0
     ]
-
-    college_rows = await db.fetch(
-        f"""
-        SELECT
-            program AS college,
-            COUNT(*) FILTER (WHERE status <> 'absent' AND score >= {PASS_MARK}) AS passed,
-            COUNT(*) FILTER (WHERE status <> 'absent') AS participants,
-            COUNT(DISTINCT course_id) AS courses
-        FROM v_exam_attempts a
-        WHERE {where_sql}
-        GROUP BY program
-        """,
-        *args,
-    )
     pass_rate_by_college = [
         {
             "college": r["college"],
-            "passRate": round((r["passed"] / r["participants"] * 100) if r["participants"] else 0, 1),
-            "participants": r["participants"],
+            "passRate": round(
+                (r["passed_attempts"] / r["taken_attempts"] * 100)
+                if r["taken_attempts"]
+                else 0,
+                1,
+            ),
+            "participants": r["taken_attempts"],
             "courses": r["courses"],
         }
-        for r in college_rows
+        for r in grain_rows
+        if r["g_program"] == 0
     ]
 
     timeline_where, timeline_args, next_i = attempt_where(filters, start=1, alias="a")
@@ -107,6 +103,13 @@ async def get_management_overview(
           AND ($2::text IS NULL OR p.id = $2)
           AND ($3::text IS NULL OR c.id = $3)
           AND ($4::text IS NULL OR a.student_id = $4)
+          AND (
+            $5::text IS NULL
+            OR EXISTS (
+              SELECT 1 FROM staff_course_assignments sca
+              WHERE sca.staff_person_id = $5 AND sca.course_id = c.id
+            )
+          )
         GROUP BY 1, 2
         ORDER BY 2
         """,
@@ -114,6 +117,7 @@ async def get_management_overview(
         filters.college_id,
         filters.curriculum_id,
         filters.student_id,
+        filters.professor_id,
     )
     timeline = [
         {"month": r["month"], "exams": r["exams"], "participants": r["participants"]}

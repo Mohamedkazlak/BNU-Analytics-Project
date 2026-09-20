@@ -479,6 +479,8 @@ select
   a.id,
   a.exam_id,
   a.student_id,
+  st.section,
+  pe.full_name as student_name,
   a.enrollment_id,
   a.score,
   a.time_taken_min,
@@ -500,6 +502,7 @@ select
   x.scheduled_at
 from exam_attempts a
 join students st on st.id = a.student_id
+join people pe on pe.id = st.person_id
 join org_units p on p.id = st.program_id
 join org_units sec on sec.id = p.parent_id
 join exams x on x.id = a.exam_id
@@ -937,6 +940,15 @@ begin
     select s.person_id
     from students s
     where s.id in (select current_visible_student_ids());
+  if acct.role = 'professor' then
+    -- Own teaching identity only. Other faculty in the college are out of scope.
+    return query
+      select o.instructor_id
+      from course_offerings o
+      where o.course_id in (select current_visible_course_ids())
+        and o.instructor_id is not null;
+    return;
+  end if;
   return query
     select st.person_id
     from staff st
@@ -1114,10 +1126,7 @@ drop policy if exists staff_read on staff;
 create policy staff_read on staff
   for select using (
     (select (current_app_account()).role) is distinct from 'student'
-    and (
-      person_id = (select (current_app_account()).person_id)
-      or org_unit_id in (select current_visible_org_unit_ids())
-    )
+    and person_id in (select current_visible_person_ids())
   );
 
 drop policy if exists students_read on students;
@@ -1177,7 +1186,13 @@ create policy questions_read on questions
 
 drop policy if exists exam_attempts_read on exam_attempts;
 create policy exam_attempts_read on exam_attempts
-  for select using (id in (select current_visible_attempt_ids()));
+  for select using (
+    student_id in (select current_visible_student_ids())
+    and (
+      (select (current_app_account()).role) is distinct from 'professor'
+      or exam_id in (select current_visible_exam_ids())
+    )
+  );
 
 drop policy if exists attempt_answers_read on attempt_answers;
 create policy attempt_answers_read on attempt_answers
@@ -1194,7 +1209,11 @@ create policy integrity_flags_read on integrity_flags
         'academic_affairs',
         'professor'
       )
-      and attempt_id in (select current_visible_attempt_ids())
+      and exists (
+        select 1
+        from exam_attempts a
+        where a.id = integrity_flags.attempt_id
+      )
     )
   );
 
@@ -1224,6 +1243,8 @@ comment on function current_visible_org_unit_ids() is
   'Session-visible org unit ids computed as a set. Does not call org_unit_is_visible() per row.';
 comment on function current_visible_attempt_ids() is
   'Session-visible exam_attempt ids. Professor rows also require the exam course to be assigned.';
+comment on function current_visible_person_ids() is
+  'Session-visible people. Professors see themselves, assigned students, and instructors of assigned courses — not other faculty.';
 
 -- ---------------------------------------------------------------------------
 -- Login + class-average helpers (SECURITY DEFINER, RLS off)

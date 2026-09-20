@@ -31,18 +31,19 @@ def visible_filter_fields(scope: AuthScope) -> list[str]:
     if role == "student":
         return []
     if role == "professor":
-        return ["student"]
-    if role in ("program_director", "academic_affairs"):
         return ["curriculum", "student"]
+    if role in ("program_director", "academic_affairs"):
+        return ["curriculum", "professor", "student"]
+    if role == "it_academic_integrity":
+        return ["sector", "college", "curriculum"]
     if role == "senior_management" and scope.scope_level == "sector":
-        return ["college", "curriculum", "student"]
-    # University-wide SM and IT
+        return ["college", "professor"]
+    if role == "senior_management":
+        return ["sector", "college", "professor"]
     return ["sector", "college", "curriculum", "student"]
 
 
 def required_filter_fields(scope: AuthScope) -> list[str]:
-    if scope.role == "senior_management" and scope.scope_level == "university":
-        return ["sectorId", "collegeId"]
     return []
 
 
@@ -74,9 +75,9 @@ def assert_filters_in_scope(scope: AuthScope, filters: AnalyticsFilters, require
     if require_complete:
         required = required_filter_fields(scope)
         if "sectorId" in required and not filters.sector_id:
-            raise HTTPException(status_code=400, detail="sectorId is required for university-wide senior management")
+            raise HTTPException(status_code=400, detail="sectorId is required")
         if "collegeId" in required and not filters.college_id:
-            raise HTTPException(status_code=400, detail="collegeId is required for university-wide senior management")
+            raise HTTPException(status_code=400, detail="collegeId is required")
 
     if role == "senior_management" and scope.scope_level == "sector":
         if filters.sector_id and scope.sector_id and filters.sector_id != scope.sector_id:
@@ -93,3 +94,5 @@ def assert_filters_in_scope(scope: AuthScope, filters: AnalyticsFilters, require
     if role == "professor":
         if filters.curriculum_id and filters.curriculum_id not in scope.course_ids:
             raise HTTPException(status_code=403, detail="Curriculum is not in your assigned teaching scope")
+        if filters.professor_id and scope.person_id and filters.professor_id != scope.person_id:
+            raise HTTPException(status_code=403, detail="Professor filter is outside your teaching scope")

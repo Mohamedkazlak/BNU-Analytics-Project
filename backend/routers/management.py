@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/management-overview", tags=["management"])
 
 @router.get("", response_model=ManagementOverview)
 async def get_overview(
-    ctx: UserContext = Depends(require_role("senior_management", "program_director")),
+    ctx: UserContext = Depends(require_role("senior_management", "program_director", "academic_affairs")),
     db: asyncpg.Connection = Depends(get_db_conn),
     filters: AnalyticsFilters = Depends(get_validated_filters),
 ):

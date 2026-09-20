@@ -59,6 +59,7 @@ export async function getAiDecision(
         collegeId: filters.collegeId ?? null,
         curriculumId: filters.curriculumId ?? null,
         studentId: filters.studentId ?? null,
+        professorId: filters.professorId ?? null,
       },
       timeoutMs: AI_REQUEST_TIMEOUT_MS,
     });

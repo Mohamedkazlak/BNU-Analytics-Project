@@ -11,7 +11,13 @@ router = APIRouter(prefix="/api/item-analysis", tags=["item_analysis"])
 
 @router.get("", response_model=ItemAnalysisReport)
 async def route_get_item_analysis(
-    ctx: UserContext = Depends(require_role("program_director", "professor")),
+    ctx: UserContext = Depends(require_role(
+        "senior_management",
+        "program_director",
+        "academic_affairs",
+        "professor",
+        "it_academic_integrity",
+    )),
     db: asyncpg.Connection = Depends(get_db_conn),
     filters: AnalyticsFilters = Depends(get_validated_filters),
 ):

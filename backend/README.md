@@ -3,8 +3,9 @@
 Role-scoped analytics API for the BNU dashboard. PostgreSQL row-level security
 is enforced per request via `app.current_user_id`.
 
-Root [README](../README.md) has full setup. Copy `../.env.example` to `.env`
-at the repo root (or export the same variables) before running.
+Root [README](../README.md) has full setup. Copy `../.env.example` to
+`backend/.env` (or the repo-root `.env`) and fill in `DATABASE_URL` and
+`JWT_SECRET`. The API loads those files on startup; you do not need to export.
 
 ```sh
 python3 -m venv venv

@@ -53,16 +53,15 @@ async def get_student_performance(
     extrema = await db.fetchrow(
         f"""
         SELECT
-            (ARRAY_AGG(s.name ORDER BY a.score DESC))[1] AS high_name,
+            (ARRAY_AGG(a.student_name ORDER BY a.score DESC))[1] AS high_name,
             MAX(a.score)::float AS high_score,
             (ARRAY_AGG(a.course_code || ' · ' || split_part(a.exam_title, '—', 1) ORDER BY a.score DESC))[1] AS high_exam,
-            (ARRAY_AGG(s.name ORDER BY a.score ASC))[1] AS low_name,
+            (ARRAY_AGG(a.student_name ORDER BY a.score ASC))[1] AS low_name,
             MIN(a.score)::float AS low_score,
             (ARRAY_AGG(a.course_code || ' · ' || split_part(a.exam_title, '—', 1) ORDER BY a.score ASC))[1] AS low_exam,
             COUNT(*) FILTER (WHERE a.score >= {PASS_MARK}) AS passed,
             COUNT(*) AS total
         FROM v_exam_attempts a
-        JOIN v_students s ON s.id = a.student_id
         WHERE {participated}
         """,
         *args,
@@ -96,15 +95,14 @@ async def get_student_performance(
         f"""
         SELECT
             a.student_id,
-            s.name,
+            a.student_name AS name,
             (ARRAY_AGG(a.course_code ORDER BY a.scheduled_at DESC))[1] AS course,
             AVG(a.score)::float AS average,
             MAX(a.score)::float AS best,
             ARRAY_AGG(a.score ORDER BY a.scheduled_at) AS scores
         FROM v_exam_attempts a
-        JOIN v_students s ON s.id = a.student_id
         WHERE {participated}
-        GROUP BY a.student_id, s.name
+        GROUP BY a.student_id, a.student_name
         ORDER BY AVG(a.score) DESC
         """,
         *args,

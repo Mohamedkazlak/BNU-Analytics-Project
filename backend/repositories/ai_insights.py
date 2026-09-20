@@ -17,11 +17,11 @@ async def top_flagged_attempts(
 
     rows = await db.fetch(
         f"""
-        WITH participated AS (
+        WITH participated AS MATERIALIZED (
             SELECT
                 a.id,
                 a.student_id,
-                s.name AS student_name,
+                a.student_name,
                 a.exam_id,
                 a.exam_title,
                 a.course_code,
@@ -30,16 +30,15 @@ async def top_flagged_attempts(
                 a.late_start,
                 a.ip
             FROM v_exam_attempts a
-            JOIN v_students s ON s.id = a.student_id
             WHERE a.participated AND {where_sql}
         ),
-        medians AS (
+        medians AS MATERIALIZED (
             SELECT exam_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY time_taken_min) AS median_time
             FROM participated
             WHERE time_taken_min IS NOT NULL
             GROUP BY exam_id
         ),
-        ip_share AS (
+        ip_share AS MATERIALIZED (
             SELECT exam_id, ip, COUNT(DISTINCT student_id) AS n
             FROM participated
             WHERE ip IS NOT NULL AND ip <> ''
@@ -74,7 +73,11 @@ async def top_flagged_attempts(
     cases = []
     for r in rows:
         evidence = []
-        if r["time_taken_min"] is not None and r["median_time"] and r["time_taken_min"] < float(r["median_time"]) * 0.6:
+        if (
+            r["time_taken_min"] is not None
+            and r["median_time"]
+            and r["time_taken_min"] < float(r["median_time"]) * 0.6
+        ):
             evidence.append(
                 {
                     "label": "Timing anomaly",

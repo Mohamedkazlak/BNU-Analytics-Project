@@ -85,14 +85,13 @@ async def get_participation_report(
     absentee_rows = await db.fetch(
         f"""
         SELECT
-            s.name AS student,
+            a.student_name AS student,
             a.course_code || ' · ' || split_part(a.exam_title, '—', 1) AS exam,
             CASE WHEN a.participated THEN 'Late start' ELSE 'No attempt' END AS reason
         FROM v_exam_attempts a
-        JOIN v_students s ON s.id = a.student_id
         WHERE {where_sql}
           AND (NOT a.participated OR a.late_start)
-        ORDER BY s.name
+        ORDER BY a.student_name
         LIMIT 12
         """,
         *args,

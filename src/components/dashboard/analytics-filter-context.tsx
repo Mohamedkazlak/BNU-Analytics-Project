@@ -11,14 +11,17 @@ import { useQuery } from "@tanstack/react-query";
 import { getFilterOptions } from "@/lib/api";
 import {
   emptyFilters,
+  sanitizeFilters,
   setFilterCollege,
   setFilterCurriculum,
+  setFilterProfessor,
   setFilterSector,
   setFilterStudent,
   type AnalyticsFilters,
   type FilterOptionsResponse,
 } from "@/lib/filter-types";
 import { useRole } from "@/components/role-context";
+import { defaultVisible } from "@/lib/filter-types";
 
 interface AnalyticsFilterContextValue {
   filters: AnalyticsFilters;
@@ -26,6 +29,7 @@ interface AnalyticsFilterContextValue {
   setSectorId: (id: string) => void;
   setCollegeId: (id: string) => void;
   setCurriculumId: (id: string) => void;
+  setProfessorId: (id: string) => void;
   setStudentId: (id: string) => void;
   studentQuery: string;
   setStudentQuery: (q: string) => void;
@@ -52,6 +56,16 @@ function writeStored(userId: string, filters: AnalyticsFilters) {
   sessionStorage.setItem(
     `bnu.analyticsFilters.${userId}`,
     JSON.stringify(filters),
+  );
+}
+
+function sameFilters(a: AnalyticsFilters, b: AnalyticsFilters): boolean {
+  return (
+    a.sectorId === b.sectorId &&
+    a.collegeId === b.collegeId &&
+    a.curriculumId === b.curriculumId &&
+    a.studentId === b.studentId &&
+    a.professorId === b.professorId
   );
 }
 
@@ -90,12 +104,23 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
       filters.sectorId ?? null,
       filters.collegeId ?? null,
       filters.curriculumId ?? null,
+      filters.professorId ?? null,
       debouncedQuery,
     ],
     queryFn: () => getFilterOptions(filters, debouncedQuery || undefined),
     enabled: Boolean(user.id) && role !== "student",
   });
   const options = optionsQuery.data;
+
+  useEffect(() => {
+    const visible = defaultVisible(role, viewer.level);
+    setFilters((current) => {
+      const next = sanitizeFilters(current, visible);
+      if (sameFilters(current, next)) return current;
+      writeStored(user.id, next);
+      return next;
+    });
+  }, [role, viewer.level, user.id]);
 
   const setSectorId = useCallback(
     (id: string) => {
@@ -106,6 +131,12 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
   const setCollegeId = useCallback(
     (id: string) => {
       persist(setFilterCollege(filters, id));
+    },
+    [persist, filters],
+  );
+  const setProfessorId = useCallback(
+    (id: string) => {
+      persist(setFilterProfessor(filters, id));
     },
     [persist, filters],
   );
@@ -123,11 +154,7 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
   );
   const clear = useCallback(() => persist(emptyFilters()), [persist]);
 
-  const required =
-    options?.required ??
-    (role === "senior_management" && viewer.level === "university"
-      ? ["sectorId", "collegeId"]
-      : []);
+  const required = options?.required ?? [];
   const filtersReady =
     role === "student" ||
     required.every((key) => {
@@ -143,6 +170,7 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
       setSectorId,
       setCollegeId,
       setCurriculumId,
+      setProfessorId,
       setStudentId,
       studentQuery,
       setStudentQuery,
@@ -155,6 +183,7 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
       setSectorId,
       setCollegeId,
       setCurriculumId,
+      setProfessorId,
       setStudentId,
       studentQuery,
       setStudentQuery,

@@ -8,6 +8,9 @@ export function ScopeBanner() {
   const college = options?.colleges.find(
     (c) => c.id === filters.collegeId,
   )?.name;
+  const professor = options?.professors?.find(
+    (p) => p.id === filters.professorId,
+  )?.name;
   const curriculum = options?.curricula.find(
     (c) => c.id === filters.curriculumId,
   );
@@ -15,6 +18,7 @@ export function ScopeBanner() {
     viewer.label,
     sector,
     college,
+    professor,
     curriculum ? `${curriculum.code}` : null,
   ].filter(Boolean);
   return (

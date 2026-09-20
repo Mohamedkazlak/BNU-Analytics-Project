@@ -2,6 +2,7 @@
 
 Loads only the datasets required for the authenticated role so insight,
 current-standing, and recommendations share one query pass.
+Integrity narratives use SQL aggregates, not the per-attempt report.
 """
 
 from __future__ import annotations
@@ -54,7 +55,7 @@ async def load_ai_context(
         return data
 
     if role == "it_academic_integrity":
-        data["integrity"] = await integrity_repo.get_integrity_report(ctx, db, filters)
+        data["integrity"] = await integrity_repo.get_integrity_counts(ctx, db, filters)
         data["flagged"] = await ai_repo.top_flagged_attempts(db, limit=3, filters=filters)
         return data
 

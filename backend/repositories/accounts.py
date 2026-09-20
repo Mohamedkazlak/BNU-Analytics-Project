@@ -71,7 +71,9 @@ async def load_auth_scope(db: asyncpg.Connection, user_id: str) -> AuthScope:
         )
         course_ids = [c["course_id"] for c in courses]
 
-    display_role = _display_role(role, scope_level, row["title_for_role"], row["staff_title"])
+    display_role = _display_role(
+        role, scope_level, row["title_for_role"], row["staff_title"]
+    )
     scope_label = _scope_label(
         role=role,
         scope_level=scope_level,
@@ -123,19 +125,28 @@ def user_context_from_scope(scope: AuthScope) -> UserContext:
     )
 
 
-def _display_role(role: str, scope_level: Optional[str], title_for_role: Optional[str], staff_title: Optional[str]) -> str:
+def _display_role(
+    role: str,
+    scope_level: Optional[str],
+    title_for_role: Optional[str],
+    staff_title: Optional[str],
+) -> str:
     if role == "senior_management":
         if scope_level == "sector":
             return "Sector Dean"
+        if staff_title:
+            return staff_title
         return title_for_role or "Senior Management"
     if role == "program_director":
         return "Program Director"
     if role == "academic_affairs":
         return "Academic Affairs"
     if role == "professor":
-        return staff_title or "Professor"
+        if staff_title and "professor" in staff_title.lower():
+            return staff_title
+        return "Professor"
     if role == "it_academic_integrity":
-        return "IT · Academic Integrity"
+        return "Academic Integrity"
     if role == "student":
         return "Student"
     return role
@@ -196,10 +207,14 @@ async def _assert_hierarchy(
         if not row or row["level"] != "program":
             raise HTTPException(status_code=400, detail="Invalid collegeId")
         if filters.sector_id and row["parent_id"] != filters.sector_id:
-            raise HTTPException(status_code=400, detail="College does not belong to the selected sector")
+            raise HTTPException(
+                status_code=400, detail="College does not belong to the selected sector"
+            )
         if scope.role == "senior_management" and scope.scope_level == "sector":
             if scope.sector_id and row["parent_id"] != scope.sector_id:
-                raise HTTPException(status_code=403, detail="College is outside your authorized sector")
+                raise HTTPException(
+                    status_code=403, detail="College is outside your authorized sector"
+                )
 
     if filters.curriculum_id:
         row = await db.fetchrow(
@@ -209,9 +224,15 @@ async def _assert_hierarchy(
         if not row:
             raise HTTPException(status_code=403, detail="Curriculum is not accessible")
         if filters.college_id and row["program_id"] != filters.college_id:
-            raise HTTPException(status_code=400, detail="Curriculum does not belong to the selected college")
+            raise HTTPException(
+                status_code=400,
+                detail="Curriculum does not belong to the selected college",
+            )
         if scope.role == "professor" and row["id"] not in scope.course_ids:
-            raise HTTPException(status_code=403, detail="Curriculum is not in your assigned teaching scope")
+            raise HTTPException(
+                status_code=403,
+                detail="Curriculum is not in your assigned teaching scope",
+            )
 
     if filters.student_id:
         row = await db.fetchrow(
@@ -221,7 +242,9 @@ async def _assert_hierarchy(
         if not row:
             raise HTTPException(status_code=403, detail="Student is not accessible")
         if filters.college_id and row["program_id"] != filters.college_id:
-            raise HTTPException(status_code=403, detail="Student is not in the selected college")
+            raise HTTPException(
+                status_code=403, detail="Student is not in the selected college"
+            )
         if scope.role == "professor":
             assigned = await db.fetchrow(
                 """
@@ -243,4 +266,59 @@ async def _assert_hierarchy(
                 raise HTTPException(
                     status_code=403,
                     detail="Student is not in your assigned teaching scope",
+                )
+
+    if filters.professor_id:
+        person = await db.fetchrow(
+            "SELECT id FROM people WHERE id = $1",
+            filters.professor_id,
+        )
+        if not person:
+            raise HTTPException(status_code=400, detail="Invalid professorId")
+        taught = await db.fetchrow(
+            """
+            SELECT 1
+            FROM staff_course_assignments sca
+            JOIN courses c ON c.id = sca.course_id
+            JOIN org_units p ON p.id = c.program_id
+            WHERE sca.staff_person_id = $1
+              AND ($2::text IS NULL OR p.parent_id = $2)
+              AND ($3::text IS NULL OR c.program_id = $3)
+              AND ($4::text IS NULL OR c.id = $4)
+            LIMIT 1
+            """,
+            filters.professor_id,
+            filters.sector_id,
+            filters.college_id,
+            filters.curriculum_id,
+        )
+        if not taught:
+            raise HTTPException(
+                status_code=403, detail="Professor is outside the selected scope"
+            )
+        if scope.role == "professor" and filters.professor_id != scope.person_id:
+            raise HTTPException(
+                status_code=403, detail="Professor filter is outside your teaching scope"
+            )
+        if filters.student_id:
+            enrolled = await db.fetchrow(
+                """
+                SELECT 1
+                FROM enrollments e
+                JOIN course_offerings o ON o.id = e.offering_id
+                JOIN staff_course_assignments sca
+                  ON sca.course_id = o.course_id
+                 AND sca.staff_person_id = $2
+                WHERE e.student_id = $1
+                  AND ($3::text IS NULL OR o.course_id = $3)
+                LIMIT 1
+                """,
+                filters.student_id,
+                filters.professor_id,
+                filters.curriculum_id,
+            )
+            if not enrolled:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Student is not in the selected professor's teaching scope",
                 )

@@ -1,6 +1,31 @@
-from typing import Optional, Tuple
+from typing import Tuple
 
 from schemas.filters import AnalyticsFilters
+
+
+def professor_teaches_course_sql(course_id_sql: str, param_index: int) -> str:
+    """True when the bound professor is assigned to this catalog course."""
+    return (
+        f"EXISTS ("
+        f" SELECT 1 FROM staff_course_assignments sca"
+        f" WHERE sca.staff_person_id = ${param_index}"
+        f"   AND sca.course_id = {course_id_sql}"
+        f")"
+    )
+
+
+def professor_teaches_student_sql(student_id_sql: str, param_index: int) -> str:
+    """True when the student is enrolled in a course assigned to the professor."""
+    return (
+        f"EXISTS ("
+        f" SELECT 1"
+        f" FROM enrollments e"
+        f" JOIN course_offerings o ON o.id = e.offering_id"
+        f" JOIN staff_course_assignments sca ON sca.course_id = o.course_id"
+        f" WHERE e.student_id = {student_id_sql}"
+        f"   AND sca.staff_person_id = ${param_index}"
+        f")"
+    )
 
 
 def attempt_where(
@@ -27,6 +52,10 @@ def attempt_where(
     if filters.student_id:
         clauses.append(f"{alias}.student_id = ${i}")
         args.append(filters.student_id)
+        i += 1
+    if filters.professor_id:
+        clauses.append(professor_teaches_course_sql(f"{alias}.course_id", i))
+        args.append(filters.professor_id)
         i += 1
     sql = " AND ".join(clauses) if clauses else "TRUE"
     return sql, args, i
@@ -63,6 +92,10 @@ def student_where(
         )
         args.append(filters.curriculum_id)
         i += 1
+    if filters.professor_id:
+        clauses.append(professor_teaches_student_sql(f"{alias}.id", i))
+        args.append(filters.professor_id)
+        i += 1
     sql = " AND ".join(clauses) if clauses else "TRUE"
     return sql, args, i
 
@@ -87,6 +120,10 @@ def course_org_where(
     if filters.curriculum_id:
         clauses.append(f"{course_alias}.id = ${i}")
         args.append(filters.curriculum_id)
+        i += 1
+    if filters.professor_id:
+        clauses.append(professor_teaches_course_sql(f"{course_alias}.id", i))
+        args.append(filters.professor_id)
         i += 1
     sql = " AND ".join(clauses) if clauses else "TRUE"
     return sql, args, i

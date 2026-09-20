@@ -39,6 +39,7 @@ def make_cache_key(
             filters.college_id or "",
             filters.curriculum_id or "",
             filters.student_id or "",
+            filters.professor_id or "",
                 str(academic_year_id or ""),
                 str(term_id or ""),
                 data_version,

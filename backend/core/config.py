@@ -1,5 +1,38 @@
 import os
+from pathlib import Path
+from typing import Optional
+
+from dotenv import load_dotenv
 from pydantic import BaseModel
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _BACKEND_DIR.parent
+
+
+def load_env_files(
+    backend_env: Optional[Path] = None,
+    root_env: Optional[Path] = None,
+) -> None:
+    """Load backend/.env, then the repo-root .env for any still-missing keys.
+
+    Existing process environment variables always win (CI, exports, pytest).
+    Interpolation is off so passwords may contain `$`.
+    """
+    load_dotenv(
+        backend_env or (_BACKEND_DIR / ".env"),
+        override=False,
+        interpolate=False,
+        encoding="utf-8",
+    )
+    load_dotenv(
+        root_env or (_REPO_ROOT / ".env"),
+        override=False,
+        interpolate=False,
+        encoding="utf-8",
+    )
+
+
+load_env_files()
 
 
 class Settings(BaseModel):

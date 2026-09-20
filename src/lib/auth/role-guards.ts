@@ -38,7 +38,11 @@ export const allowedRolesByPath: Record<string, Role[]> = {
   "/professor": ["professor"],
   "/integrity": ["it_academic_integrity", "senior_management"],
   "/my-progress": ["student"],
-  "/exam-activity": ["senior_management", "program_director"],
+  "/exam-activity": [
+    "senior_management",
+    "program_director",
+    "academic_affairs",
+  ],
   "/courses": [
     "senior_management",
     "program_director",
@@ -63,8 +67,14 @@ export const allowedRolesByPath: Record<string, Role[]> = {
     "academic_affairs",
     "professor",
   ],
-  "/item-analysis": ["program_director", "professor"],
-  "/real-time": ["professor", "it_academic_integrity"],
+  "/item-analysis": [
+    "senior_management",
+    "program_director",
+    "academic_affairs",
+    "professor",
+    "it_academic_integrity",
+  ],
+  "/real-time": ["senior_management", "professor", "it_academic_integrity"],
 };
 
 export function rolesAllowedForPath(pathname: string): Role[] | undefined {

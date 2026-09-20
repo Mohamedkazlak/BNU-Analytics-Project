@@ -92,11 +92,16 @@ def test_optimization_migrations_are_additive_definition_only():
     assert "transcript_entries_course_id_idx" in schema
     assert "exam_attempts_enrollment_student_fk" in schema
     assert "enrollments_id_student_id_key" in schema
-    assert "select u.id from org_units u where org_unit_is_visible" not in schema.lower()
+    assert (
+        "select u.id from org_units u where org_unit_is_visible" not in schema.lower()
+    )
     for name in (
         "011_set_updated_at_search_path_and_fk_indexes.sql",
         "012_exam_attempts_enrollment_student_fk.sql",
         "013_rls_initplan_visibility_sets.sql",
+        "014_professor_staff_isolation.sql",
+        "015_exam_attempts_section.sql",
+        "016_ai_insights_attempt_scale.sql",
     ):
         sql = _active_sql(_migration_sql(name))
         assert "delete from" not in sql, name
@@ -158,3 +163,49 @@ def test_migration_010_only_backfills_unmarked_syn_transc_rows():
     assert "create " not in lowered
     assert "insert " not in lowered
     assert "delete " not in lowered
+
+
+def test_migration_015_exposes_section_on_exam_attempts_view():
+    schema = (ROOT / "db" / "schema.sql").read_text()
+    assert "st.section" in schema
+    migration = _migration_sql("015_exam_attempts_section.sql")
+    sql = _active_sql(migration)
+    assert "st.section" in migration
+    assert "create view v_exam_attempts" in sql
+    assert "delete from" not in sql
+    assert "drop table" not in sql
+    repo = (ROOT / "backend" / "repositories" / "course_performance.py").read_text()
+    assert "JOIN v_students" not in repo
+    assert "a.section" in repo
+
+
+def test_migration_016_scales_ai_insights_attempt_lookups():
+    schema = (ROOT / "db" / "schema.sql").read_text()
+    assert "pe.full_name as student_name" in schema.lower()
+    assert "student_id in (select current_visible_student_ids())" in schema.lower()
+    migration = _migration_sql("016_ai_insights_attempt_scale.sql")
+    sql = _active_sql(migration)
+    assert "pe.full_name as student_name" in sql
+    assert "student_id in (select current_visible_student_ids())" in sql
+    assert "id in (select current_visible_attempt_ids())" not in sql
+    assert "delete from" not in sql
+    assert "drop table" not in sql
+    repos = ROOT / "backend" / "repositories"
+    for name in (
+        "ai_insights.py",
+        "integrity.py",
+        "participation.py",
+        "performance.py",
+        "realtime.py",
+        "course_performance.py",
+    ):
+        text = (repos / name).read_text()
+        assert "JOIN v_students" not in text, name
+    integrity_src = (repos / "integrity.py").read_text().lower()
+    assert "ip_share as materialized" in integrity_src
+    assert "medians as materialized" in integrity_src
+    counts_src = integrity_src[integrity_src.index("async def get_integrity_counts") :]
+    assert "get_integrity_report(" not in counts_src
+    context = (ROOT / "backend" / "services" / "ai_context.py").read_text()
+    assert "get_integrity_counts" in context
+    assert "get_integrity_report" not in context

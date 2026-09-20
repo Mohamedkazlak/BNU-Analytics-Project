@@ -47,6 +47,7 @@ describe("ai-insights combined decision", () => {
         collegeId: "col-a",
         curriculumId: null,
         studentId: null,
+        professorId: null,
       },
     });
     expect(result.status).toBe("ok");

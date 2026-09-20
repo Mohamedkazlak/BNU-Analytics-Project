@@ -30,7 +30,7 @@ export const roleLabels: Record<Role, string> = {
   program_director: "Program Director",
   academic_affairs: "Academic Affairs",
   professor: "Professor",
-  it_academic_integrity: "IT · Academic Integrity",
+  it_academic_integrity: "Academic Integrity",
   student: "Student",
 };
 
@@ -84,9 +84,19 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
           title: "Student Participation Reports",
         },
         {
+          to: "/item-analysis",
+          label: "Item Analysis",
+          title: "Item Analysis Reports",
+        },
+        {
           to: "/integrity",
           label: "Academic Integrity",
           title: "Academic Integrity & Exam Monitoring",
+        },
+        {
+          to: "/real-time",
+          label: "Live Exam Monitor",
+          title: "Live Monitoring",
         },
       ],
     },
@@ -148,6 +158,11 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
           title: "Academic Affairs · Student Performance & Attendance",
         },
         {
+          to: "/exam-activity",
+          label: "Exam Activity",
+          title: "Exam Activity & Enrollment Trends",
+        },
+        {
           to: "/performance",
           label: "Student Performance",
           title: "Student Performance Reports",
@@ -161,6 +176,11 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
           to: "/courses",
           label: "Curricula",
           title: "Curriculum Performance",
+        },
+        {
+          to: "/item-analysis",
+          label: "Item Analysis",
+          title: "Item Analysis Reports",
         },
         {
           to: "/students",
@@ -225,6 +245,11 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
           to: "/integrity",
           label: "Flagged Cases",
           title: "Academic Integrity & Exam Monitoring",
+        },
+        {
+          to: "/item-analysis",
+          label: "Exam Analysis",
+          title: "Item Analysis Reports",
         },
         {
           to: "/real-time",

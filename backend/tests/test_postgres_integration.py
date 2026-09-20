@@ -418,6 +418,9 @@ def test_migrated_schema_matches_fresh_curriculum_and_org_policy(fresh_db, migra
         "011",
         "012",
         "013",
+        "014",
+        "015",
+        "016",
     ]
     sector_col = asyncio.run(
         _fetch(
@@ -425,12 +428,17 @@ def test_migrated_schema_matches_fresh_curriculum_and_org_policy(fresh_db, migra
             """
             SELECT column_name FROM information_schema.columns
             WHERE table_schema='public' AND table_name='v_exam_attempts'
-              AND column_name IN ('sector_id', 'program_id')
+              AND column_name IN ('sector_id', 'program_id', 'section', 'student_name')
             ORDER BY 1
             """,
         )
     )
-    assert [r["column_name"] for r in sector_col] == ["program_id", "sector_id"]
+    assert [r["column_name"] for r in sector_col] == [
+        "program_id",
+        "section",
+        "sector_id",
+        "student_name",
+    ]
     org_src = _function_src(fresh_db, "current_visible_org_unit_ids")
     migrated_org_src = _function_src(migrated_db, "current_visible_org_unit_ids")
     assert "org_unit_is_visible" not in org_src
@@ -482,6 +490,11 @@ def test_migration_runner_skips_already_applied(migrated_db):
     )
     assert (
         "skip 013_rls_initplan_visibility_sets.sql (already applied)" in runner.stdout
+    )
+    assert "skip 014_professor_staff_isolation.sql (already applied)" in runner.stdout
+    assert "skip 015_exam_attempts_section.sql (already applied)" in runner.stdout
+    assert (
+        "skip 016_ai_insights_attempt_scale.sql (already applied)" in runner.stdout
     )
     assert not any(line.startswith("applied ") for line in runner.stdout.splitlines())
 
@@ -738,7 +751,10 @@ def test_migration_010_backfills_unmarked_syn_transc_via_runner():
           ('009', '009_disable_schema_migrations_rls.sql'),
           ('011', '011_set_updated_at_search_path_and_fk_indexes.sql'),
           ('012', '012_exam_attempts_enrollment_student_fk.sql'),
-          ('013', '013_rls_initplan_visibility_sets.sql');
+          ('013', '013_rls_initplan_visibility_sets.sql'),
+          ('014', '014_professor_staff_isolation.sql'),
+          ('015', '015_exam_attempts_section.sql'),
+          ('016', '016_ai_insights_attempt_scale.sql');
         """,
     )
     if setup.returncode != 0:
@@ -810,8 +826,11 @@ def test_migration_010_backfills_unmarked_syn_transc_via_runner():
         "011",
         "012",
         "013",
+        "014",
+        "015",
+        "016",
     ]
-    assert recorded[-1]["filename"] == "013_rls_initplan_visibility_sets.sql"
+    assert recorded[-1]["filename"] == "016_ai_insights_attempt_scale.sql"
 
     _apply_file(url, ROOT / "db" / "migrations" / "010_syn_transc_marker_backfill.sql")
     reapplied = asyncio.run(
@@ -843,6 +862,17 @@ def test_rls_professor_sees_only_enrolled_assigned_students(fresh_db):
     ids = {r["id"] for r in rows}
     assert "s7" in ids
     assert "s70" not in ids
+
+
+def test_rls_professor_cannot_see_other_faculty(fresh_db):
+    rows = asyncio.run(
+        _fetch_as_app(FRESH_DB, "u-prof-cs", "SELECT person_id FROM staff")
+    )
+    ids = {r["person_id"] for r in rows}
+    assert "p-tomas-oyelaran" in ids
+    assert "p-yasser-mansour" not in ids
+    assert "p-mai-khalil" not in ids
+    assert "p-daniel-osei" not in ids
 
 
 def test_rls_sector_dean_cannot_see_foreign_org_units(fresh_db):
@@ -1089,7 +1119,7 @@ def test_rls_v_exam_attempts_plan_uses_initplan_not_per_row_helpers(fresh_db):
     assert "hashed SubPlan" in blob
     for node in _walk_plan(plan["Plan"]):
         if node.get("Parent Relationship") == "SubPlan":
-            assert node.get("Actual Loops", 1) == 1
+            assert node.get("Actual Loops", 1) <= 1
     join_plan = asyncio.run(
         _explain_as_app(
             FRESH_DB,

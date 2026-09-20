@@ -147,6 +147,15 @@ async def _scoped_offering_year_count(
         clauses.append(f"c.id = ${i}")
         args.append(filters.curriculum_id)
         i += 1
+    if filters.professor_id:
+        clauses.append(
+            f"""EXISTS (
+                SELECT 1 FROM staff_course_assignments sca
+                WHERE sca.course_id = c.id AND sca.staff_person_id = ${i}
+            )"""
+        )
+        args.append(filters.professor_id)
+        i += 1
     if filters.student_id:
         clauses.append(
             f"""EXISTS (

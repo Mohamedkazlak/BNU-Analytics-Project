@@ -58,10 +58,13 @@ async def get_validated_filters(
     collegeId: str | None = None,
     curriculumId: str | None = None,
     studentId: str | None = None,
+    professorId: str | None = None,
     ctx: UserContext = Depends(get_live_user),
     db: asyncpg.Connection = Depends(get_db_conn),
 ) -> AnalyticsFilters:
-    filters = AnalyticsFilters.from_query(sectorId, collegeId, curriculumId, studentId)
+    filters = AnalyticsFilters.from_query(
+        sectorId, collegeId, curriculumId, studentId, professorId
+    )
     return await validate_analytics_filters(ctx, db, filters)
 
 
@@ -70,9 +73,12 @@ async def get_partial_filters(
     collegeId: str | None = None,
     curriculumId: str | None = None,
     studentId: str | None = None,
+    professorId: str | None = None,
     ctx: UserContext = Depends(get_live_user),
     db: asyncpg.Connection = Depends(get_db_conn),
 ) -> AnalyticsFilters:
     """Filter-options may be requested before required analytics filters are set."""
-    filters = AnalyticsFilters.from_query(sectorId, collegeId, curriculumId, studentId)
+    filters = AnalyticsFilters.from_query(
+        sectorId, collegeId, curriculumId, studentId, professorId
+    )
     return await validate_analytics_filters(ctx, db, filters, require_complete=False)

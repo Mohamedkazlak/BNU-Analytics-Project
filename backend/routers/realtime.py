@@ -11,7 +11,9 @@ router = APIRouter(prefix="/api/real-time-struggling", tags=["realtime"])
 
 @router.get("", response_model=RealTimeReport)
 async def route_get_real_time_struggling(
-    ctx: UserContext = Depends(require_role("professor", "it_academic_integrity")),
+    ctx: UserContext = Depends(require_role(
+        "senior_management", "professor", "it_academic_integrity"
+    )),
     db: asyncpg.Connection = Depends(get_db_conn),
     filters: AnalyticsFilters = Depends(get_validated_filters),
 ):

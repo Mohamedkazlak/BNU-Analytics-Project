@@ -49,14 +49,13 @@ async def get_course_performance(
         f"""
         SELECT
             a.course_code AS course,
-            s.section,
+            a.section,
             AVG(a.score)::float AS average,
             COUNT(*) FILTER (WHERE a.score >= {PASS_MARK}) AS passed,
             COUNT(*) AS total
         FROM v_exam_attempts a
-        JOIN v_students s ON s.id = a.student_id
         WHERE {participated}
-        GROUP BY a.course_code, s.section
+        GROUP BY a.course_code, a.section
         """,
         *args,
     )
