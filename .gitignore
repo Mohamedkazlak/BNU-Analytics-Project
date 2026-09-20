@@ -1,6 +1,9 @@
 # Dependencies
 node_modules
 backend/venv
+venv/
+.venv/
+.venv-import/
 
 # Build and generated output
 dist

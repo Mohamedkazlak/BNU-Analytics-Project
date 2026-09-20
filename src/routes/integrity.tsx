@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AiDecisionSection } from "@/components/ai-insights";
-import { ScopeBanner } from "@/components/scope-banner";
+import { ScopeBanner } from "@/components/dashboard/scope-banner";
 import { useQuery } from "@tanstack/react-query";
 import { getIntegrityReport } from "@/lib/api";
 import {
@@ -11,10 +11,10 @@ import {
   StatBlock,
   TableShell,
   Th,
-} from "@/components/dashboard-ui";
-import { FiltersRequiredNotice } from "@/components/analytics-filters";
-import { useFilteredQuery } from "@/hooks/use-analytics-filters";
-import { roleGuard } from "@/lib/role-guards";
+} from "@/components/dashboard/dashboard-ui";
+import { FiltersRequiredNotice } from "@/components/dashboard/analytics-filters";
+import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
+import { roleGuard } from "@/lib/auth/role-guards";
 
 export const Route = createFileRoute("/integrity")({
   beforeLoad: roleGuard("/integrity"),

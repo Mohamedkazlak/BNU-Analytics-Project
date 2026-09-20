@@ -10,7 +10,7 @@ import type {
   StudentPerformanceReport,
   StudentProfileReport,
 } from "./types";
-import { getAuthToken, clearAuthToken } from "./auth-token";
+import { getAuthToken, clearAuthToken } from "./auth/token";
 import {
   toSearchParams,
   type AnalyticsFilters,

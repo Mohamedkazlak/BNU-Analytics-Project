@@ -8,14 +8,13 @@ import {
   Scripts,
   redirect,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { RoleProvider } from "@/components/role-context";
-import { AnalyticsFilterProvider } from "@/components/analytics-filter-context";
+import { AnalyticsFilterProvider } from "@/components/dashboard/analytics-filter-context";
 import { AppShell } from "@/components/app-shell";
-import { getActiveDemoRole } from "@/lib/role-guards";
+import { getActiveDemoRole } from "@/lib/auth/role-guards";
 
 function NotFoundComponent() {
   return (
@@ -44,9 +43,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">

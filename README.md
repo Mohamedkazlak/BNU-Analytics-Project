@@ -2,8 +2,6 @@
 
 A role-aware academic assessment analytics platform for Benha National University online testing programs.
 
-**Live app:** https://visual-files.lovable.app
-
 ## What it does
 
 BNU Analytics turns assessment activity into actionable reporting for university, sector, program, and course-level users. The application covers:
@@ -37,14 +35,41 @@ Production frontend data comes only from FastAPI → PostgreSQL. There is no moc
 
 Longer notes: [architecture](docs/architecture.md), [authorization](docs/authorization.md), [data model](docs/data-model.md), [AI](docs/ai.md).
 
+## Layout
+
+```text
+.github/             CI
+src/                 Frontend (TanStack Start)
+  routes/            File-based pages — do not rename this folder
+  components/        Shell, chat, AI cards, dashboard widgets
+    dashboard/       Shared panels, filters, overview
+  lib/
+    api.ts           FastAPI client
+    auth/            JWT cookie/token and route guards
+    ai/              Decision + chat client
+    errors/          SSR error pages
+backend/             FastAPI (venv + uvicorn live in this directory)
+db/                  schema.sql, seed.sql, migrations/
+docs/                Architecture, authorization, data model, AI
+public/              Brand assets served by Vite
+
+# Tool configs — must stay at repo root (Vite, tsc, ESLint, pytest look here)
+.env.example         Copy to .env; never commit secrets
+vite.config.ts       Dev server and production build
+vitest.config.ts     Frontend unit tests
+tsconfig.json        TypeScript
+eslint.config.js     Lint
+pytest.ini           Backend tests (`pythonpath = backend`)
+```
+
 ## Stack
 
-| Layer | Technology |
-| --- | --- |
+| Layer    | Technology                                                              |
+| -------- | ----------------------------------------------------------------------- |
 | Frontend | React 19, TanStack Start/Router, TanStack Query, Tailwind CSS, Recharts |
-| Backend | FastAPI, asyncpg, Pydantic, PyJWT |
-| Database | PostgreSQL / Supabase, Row Level Security |
-| Tooling | Vite, TypeScript, ESLint, Prettier, Vitest, pytest |
+| Backend  | FastAPI, asyncpg, Pydantic, PyJWT                                       |
+| Database | PostgreSQL / Supabase, Row Level Security                               |
+| Tooling  | Vite, TypeScript, ESLint, Prettier, Vitest, pytest                      |
 
 ## Local development
 

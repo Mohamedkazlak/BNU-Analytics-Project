@@ -1,9 +1,9 @@
-"""Backend-enforced chat: role/domain gate ported from the frontend's former
-src/lib/ai-scope.ts + src/lib/assistant.functions.ts, but running here where
-`ctx.role` comes from the verified JWT (see core/dependencies.get_current_user)
-instead of a client-supplied field. `classify()` stays a deterministic,
-pre-retrieval permission gate — exactly the shape needed once Phase 3 adds a
-document retriever alongside these aggregate answers.
+"""Backend-enforced chat: role/domain gate that used to live on the frontend,
+but runs here where `ctx.role` comes from the verified JWT (see
+core/dependencies.get_current_user) instead of a client-supplied field.
+`classify()` stays a deterministic, pre-retrieval permission gate — exactly
+the shape needed once Phase 3 adds a document retriever alongside these
+aggregate answers.
 """
 
 import re
@@ -45,7 +45,7 @@ DOMAIN_ALLOW: dict[str, set[str]] = {
         "institution_kpis",
         "item_analysis",
     },
-    # staffKpiDomains in the original ai-scope.ts
+    # Staff KPI domains (university / college / course aggregates)
     "program_director": {
         "institution_kpis",
         "all_courses",

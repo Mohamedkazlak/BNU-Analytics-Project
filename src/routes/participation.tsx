@@ -21,11 +21,11 @@ import {
   Th,
   chartColors,
   tooltipStyle,
-} from "@/components/dashboard-ui";
-import { FiltersRequiredNotice } from "@/components/analytics-filters";
-import { useFilteredQuery } from "@/hooks/use-analytics-filters";
-import { roleGuard } from "@/lib/role-guards";
-import { ScopeBanner } from "@/components/scope-banner";
+} from "@/components/dashboard/dashboard-ui";
+import { FiltersRequiredNotice } from "@/components/dashboard/analytics-filters";
+import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
+import { roleGuard } from "@/lib/auth/role-guards";
+import { ScopeBanner } from "@/components/dashboard/scope-banner";
 
 export const Route = createFileRoute("/participation")({
   beforeLoad: roleGuard("/participation"),

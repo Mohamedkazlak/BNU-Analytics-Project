@@ -31,12 +31,12 @@ import {
   SearchInput,
   chartColors,
   tooltipStyle,
-} from "@/components/dashboard-ui";
+} from "@/components/dashboard/dashboard-ui";
 import type { RankedStudent } from "@/lib/types";
-import { FiltersRequiredNotice } from "@/components/analytics-filters";
-import { useFilteredQuery } from "@/hooks/use-analytics-filters";
-import { roleGuard } from "@/lib/role-guards";
-import { ScopeBanner } from "@/components/scope-banner";
+import { FiltersRequiredNotice } from "@/components/dashboard/analytics-filters";
+import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
+import { roleGuard } from "@/lib/auth/role-guards";
+import { ScopeBanner } from "@/components/dashboard/scope-banner";
 
 export const Route = createFileRoute("/performance")({
   beforeLoad: roleGuard("/performance"),
