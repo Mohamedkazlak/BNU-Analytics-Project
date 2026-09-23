@@ -23,6 +23,7 @@ import {
 import type { Recommendation } from "@/lib/ai/recommendations";
 import { useRole } from "./role-context";
 import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
+import { ROLE_SLUG, roleRouteTo } from "@/lib/auth/role-guards";
 
 const EMPTY_COPY =
   "Not enough data yet to generate insights — check back after your next exam.";
@@ -61,9 +62,12 @@ function AiSkeleton({ label }: { label: string }) {
 }
 
 function AiAction({ label, to }: { label: string; to: string }) {
+  const { role } = useRole();
   return (
     <Link
-      to={to}
+      to={roleRouteTo(to)}
+      params={{ role: ROLE_SLUG[role] }}
+      search={{}}
       className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-ai px-4 py-2 text-[12px] font-semibold text-white shadow-lg shadow-ai/25 transition-opacity hover:opacity-90"
     >
       {label} <span aria-hidden>→</span>
@@ -238,10 +242,15 @@ export function ConfirmDialog({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const { role } = useRole();
   function confirm() {
     onClose();
     if (action.to) {
-      navigate({ to: action.to });
+      void navigate({
+        to: roleRouteTo(action.to),
+        params: { role: ROLE_SLUG[role] },
+        search: {},
+      });
       return;
     }
     toast.success(
@@ -413,7 +422,7 @@ export function AiDecisionCard({
               const Icon = item.kind === "action" ? CircleCheck : AlertCircle;
               return (
                 <li key={item.id} className="rounded-2xl bg-white/60 p-3.5">
-                  <div className="flex items-start gap-3">
+                  <div className="flex flex-wrap items-start gap-3">
                     <Icon
                       className={cn(
                         "mt-0.5 size-4 shrink-0",
@@ -421,7 +430,7 @@ export function AiDecisionCard({
                       )}
                       strokeWidth={2.2}
                     />
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 basis-48">
                       <p className="text-[13px] font-medium leading-relaxed text-ink">
                         {item.text}
                       </p>

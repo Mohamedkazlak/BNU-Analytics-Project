@@ -3,14 +3,17 @@ from typing import List, Literal
 
 class AverageByCourse(BaseModel):
     course: str
+    courseCode: str = ""
     average: float
     quality: float
 
 class SectionRow(BaseModel):
     section: str
     course: str
+    courseCode: str = ""
     average: float
     passRate: float
+    enrolled: int = 0
 
 class AssignedCourseRow(BaseModel):
     id: str

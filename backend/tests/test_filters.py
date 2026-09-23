@@ -22,9 +22,10 @@ def test_empty_filters_do_not_widen_with_unbounded_or():
     assert args == []
 
 
-def test_professor_filter_uses_assignments():
+def test_professor_filter_uses_assignments_or_offerings():
     sql, args, next_i = attempt_where(AnalyticsFilters(professor_id="p-prof"))
     assert "staff_course_assignments" in sql
+    assert "course_offerings" in sql
     assert "p-prof" not in sql
     assert args == ["p-prof"]
     assert next_i == 2

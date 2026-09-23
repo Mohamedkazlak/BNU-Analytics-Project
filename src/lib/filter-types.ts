@@ -1,9 +1,9 @@
 export interface AnalyticsFilters {
-  sectorId?: string;
-  collegeId?: string;
-  curriculumId?: string;
-  studentId?: string;
-  professorId?: string;
+  sectorId?: string | undefined;
+  collegeId?: string | undefined;
+  curriculumId?: string | undefined;
+  studentId?: string | undefined;
+  professorId?: string | undefined;
 }
 
 export interface FilterOption {
@@ -41,15 +41,73 @@ export interface FilterOptionsResponse {
   containsSynthetic?: boolean;
 }
 
+export const FILTER_SEARCH_KEYS = [
+  "sectorId",
+  "collegeId",
+  "curriculumId",
+  "studentId",
+  "professorId",
+] as const satisfies ReadonlyArray<keyof AnalyticsFilters>;
+
+export const FILTER_SEARCH_DEFAULTS: AnalyticsFilters = {
+  sectorId: undefined,
+  collegeId: undefined,
+  curriculumId: undefined,
+  studentId: undefined,
+  professorId: undefined,
+};
+
+function searchValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/** Parse dashboard filter IDs from a route query string or search object. */
+export function fromSearchParams(
+  search: string | URLSearchParams | Record<string, unknown>,
+): AnalyticsFilters {
+  const read = (key: string): unknown => {
+    if (typeof search === "string") {
+      const query = search.startsWith("?") ? search.slice(1) : search;
+      return new URLSearchParams(query).get(key);
+    }
+    if (search instanceof URLSearchParams) return search.get(key);
+    return search[key];
+  };
+  const next: AnalyticsFilters = {};
+  for (const key of FILTER_SEARCH_KEYS) {
+    const value = searchValue(read(key));
+    if (value) next[key] = value;
+  }
+  return next;
+}
+
 export function toSearchParams(filters: AnalyticsFilters): string {
   const params = new URLSearchParams();
-  if (filters.sectorId) params.set("sectorId", filters.sectorId);
-  if (filters.collegeId) params.set("collegeId", filters.collegeId);
-  if (filters.curriculumId) params.set("curriculumId", filters.curriculumId);
-  if (filters.studentId) params.set("studentId", filters.studentId);
-  if (filters.professorId) params.set("professorId", filters.professorId);
+  for (const key of FILTER_SEARCH_KEYS) {
+    const value = filters[key];
+    if (value) params.set(key, value);
+  }
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+export function applyFilterSearch(
+  prev: Record<string, unknown> | AnalyticsFilters,
+  filters: AnalyticsFilters,
+): AnalyticsFilters {
+  const next: AnalyticsFilters = { ...prev };
+  for (const key of FILTER_SEARCH_KEYS) {
+    next[key] = filters[key];
+  }
+  return next;
+}
+
+export function sameFilters(a: AnalyticsFilters, b: AnalyticsFilters): boolean {
+  return FILTER_SEARCH_KEYS.every((key) => a[key] === b[key]);
+}
+
+export function hasFilterValues(filters: AnalyticsFilters): boolean {
+  return FILTER_SEARCH_KEYS.some((key) => Boolean(filters[key]));
 }
 
 export function filterQueryKey(
@@ -119,10 +177,16 @@ export function setFilterSector(sectorId: string): AnalyticsFilters {
 export function setFilterCollege(
   current: AnalyticsFilters,
   collegeId: string,
+  collegeSectorId?: string,
 ): AnalyticsFilters {
   const next: AnalyticsFilters = {};
+  if (collegeId) {
+    next.collegeId = collegeId;
+    const sectorId = collegeSectorId || current.sectorId;
+    if (sectorId) next.sectorId = sectorId;
+    return next;
+  }
   if (current.sectorId) next.sectorId = current.sectorId;
-  if (collegeId) next.collegeId = collegeId;
   return next;
 }
 

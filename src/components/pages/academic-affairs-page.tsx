@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AiDecisionSection } from "@/components/ai-insights";
 import { ScopeBanner } from "@/components/dashboard/scope-banner";
@@ -19,30 +19,9 @@ import {
 } from "@/components/dashboard/dashboard-ui";
 import { FiltersRequiredNotice } from "@/components/dashboard/analytics-filters";
 import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
-import { roleGuard } from "@/lib/auth/role-guards";
 
-export const Route = createFileRoute("/academic-affairs")({
-  beforeLoad: roleGuard("/academic-affairs"),
-  head: () => ({
-    meta: [
-      { title: "Academic Affairs — Student Performance — BNU" },
-      {
-        name: "description",
-        content:
-          "College-level student performance, attendance and curriculum reports for academic affairs.",
-      },
-      { property: "og:title", content: "Academic Affairs — BNU" },
-      {
-        property: "og:description",
-        content:
-          "College-level student performance, attendance and curriculum reports for academic affairs.",
-      },
-    ],
-  }),
-  component: AcademicAffairsShell,
-});
-
-function AcademicAffairsShell() {
+export function AcademicAffairsPage() {
+  const { role } = useParams({ from: "/$role" });
   const performanceQ = useFilteredQuery("student-performance");
   const participationQ = useFilteredQuery("participation");
   const directoryQ = useFilteredQuery("student-directory");
@@ -169,7 +148,9 @@ function AcademicAffairsShell() {
           title="Attendance alerts"
           action={
             <Link
-              to="/participation"
+              to="/$role/participation"
+              params={{ role }}
+              search={{}}
               className="text-[12px] font-semibold text-iris underline underline-offset-2"
             >
               Full attendance →
@@ -197,7 +178,9 @@ function AcademicAffairsShell() {
           title="Students needing follow-up"
           action={
             <Link
-              to="/students"
+              to="/$role/students"
+              params={{ role }}
+              search={{}}
               className="text-[12px] font-semibold text-iris underline underline-offset-2"
             >
               All profiles →

@@ -1,0 +1,46 @@
+---
+description: Architectural contract for analytics and AI. SQL is the source of truth; LLM/RAG/forecasts are future layers. Do not implement those layers unless the user asks.
+alwaysApply: true
+---
+
+# AI Analytics Principles
+
+Read `docs/AI_ANALYTICS_PRINCIPLES.md` before changing analytics or AI. It is the contract. Do not weaken it in code.
+
+## Current vs target (do not implement the target unless asked)
+
+Today (`docs/ai.md`): SQL repositories → structured context → **template** insight / standing / recommendations. No LLM. No RAG. `prediction` is **current standing**, not a forecast.
+
+Target: SQL facts → optional RAG context → optional forecast model → LLM **explains** verified evidence.
+
+Leave these extension points intact; do not invent a second AI path.
+
+| Layer                          | Current home                                          | Future work goes here                             |
+| ------------------------------ | ----------------------------------------------------- | ------------------------------------------------- |
+| SQL facts                      | `backend/repositories/*`, `load_ai_context`           | Keep calculating metrics in SQL                   |
+| Template / later LLM narrative | `backend/services/ai_insights.py`                     | SQL-to-text + LLM explanation                     |
+| Standing / forecast            | `backend/services/predictions.py`                     | Real model only when multi-term data exists       |
+| Chat                           | `backend/services/chat.py`, `src/lib/ai/assistant.ts` | Route question → SQL and/or RAG → grounded answer |
+| UI                             | `src/components/ai-insights.tsx`, `src/lib/ai/*`      | Evidence, confirm-first actions                   |
+
+Page-local copy (e.g. exam-activity insight helpers) must stay SQL-derived numbers, same as templates.
+
+## Before any AI/analytics change
+
+1. What data is needed?
+2. SQL, RAG, or both? If it is a number, SQL first.
+3. Is the calculation deterministic? Then do not use an LLM.
+4. Insight, warning, recommendation, or prediction?
+5. What evidence supports it? Can the UI show “Based on”?
+6. Does role/scope/RLS allow that evidence?
+7. Could the wording be read as an unsupported fact or cause?
+
+## Non-negotiable
+
+- Database + SQL are the source of truth. The LLM must not invent metrics.
+- Warnings come from thresholds/signals; the model only explains them.
+- Recommendations are suggestions. Humans confirm. No silent actions.
+- Predictions need a forecasting model. Never label an LLM guess as a forecast.
+- RAG is for policy/docs, not for averages, counts, or rates.
+- Same auth and scope as the rest of the app. Never give the model unrestricted data.
+- Keep the PoC simple. Prefer deterministic SQL when that is enough.

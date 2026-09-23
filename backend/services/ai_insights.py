@@ -62,15 +62,15 @@ def _insight_from_context(role: str, data: dict[str, Any]) -> Optional[dict]:
             headline = f"{weakest['college']} pass rate is {weakest['passRate']}%"
             body = (
                 f"{weakest['college']} spans {weakest['courses']} curricula with "
-                f"{weakest['participants']} recorded participants this term, at a "
-                f"{weakest['passRate']}% pass rate."
+                f"{weakest['participants']} students who sat exams this term, at a "
+                f"{weakest['passRate']}% student pass rate."
             )
         else:
             headline = f"{weakest['college']} has the lowest pass rate in this view"
             body = (
                 f"Across the {len(colleges)} colleges in this view, {weakest['college']} sits at "
-                f"{weakest['passRate']}% pass — the lowest here, from {weakest['participants']} "
-                "recorded attempts."
+                f"{weakest['passRate']}% student pass — the lowest here, from "
+                f"{weakest['participants']} students."
             )
         if weakest_course:
             body += (
@@ -87,8 +87,12 @@ def _insight_from_context(role: str, data: dict[str, Any]) -> Optional[dict]:
         participation = data.get("participation") or {}
         performance = data.get("performance") or {}
         curricula = participation.get("attendanceByCurriculum") or []
-        weakest_att = min(curricula, key=lambda c: c["attendance"]) if curricula else None
-        below_pass = [r for r in performance.get("ranked") or [] if r["status"] == "Fail"]
+        weakest_att = (
+            min(curricula, key=lambda c: c["attendance"]) if curricula else None
+        )
+        below_pass = [
+            r for r in performance.get("ranked") or [] if r["status"] == "Fail"
+        ]
         if not weakest_att and not below_pass:
             return {
                 "headline": "No performance data in this scope yet",
@@ -97,7 +101,9 @@ def _insight_from_context(role: str, data: dict[str, Any]) -> Optional[dict]:
             }
         parts = []
         if below_pass:
-            parts.append(f"{len(below_pass)} student(s) are currently below the {PASS_MARK}% pass mark")
+            parts.append(
+                f"{len(below_pass)} student(s) are currently below the {PASS_MARK}% pass mark"
+            )
         if weakest_att:
             parts.append(
                 f"{weakest_att['course']} has the weakest attendance in the college at "
@@ -167,7 +173,9 @@ def _insight_from_context(role: str, data: dict[str, Any]) -> Optional[dict]:
             body += " No graded item-level answers are recorded yet, so item analysis has nothing to flag."
         warnings = []
         curricula = participation.get("attendanceByCurriculum") or []
-        weakest_att = min(curricula, key=lambda c: c["attendance"]) if curricula else None
+        weakest_att = (
+            min(curricula, key=lambda c: c["attendance"]) if curricula else None
+        )
         if weakest_att and weakest_att["attendance"] < 90:
             warnings.append(
                 {
@@ -224,7 +232,9 @@ def _insight_from_context(role: str, data: dict[str, Any]) -> Optional[dict]:
     return None
 
 
-def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: str) -> Optional[dict]:
+def _recommendations_from_context(
+    role: str, data: dict[str, Any], insight_id: str
+) -> Optional[dict]:
     items: list[dict] = []
 
     if role == "student":
@@ -248,7 +258,10 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
                     "Your real score history",
                     [
                         {"label": "Your average", "detail": f"{dashboard['average']}"},
-                        {"label": "Class average", "detail": f"{dashboard['classAverage']}"},
+                        {
+                            "label": "Class average",
+                            "detail": f"{dashboard['classAverage']}",
+                        },
                     ],
                     None,
                 )
@@ -262,7 +275,12 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
                     PASS_MARK,
                     f"Your weakest recorded exam is {worst['exam']} at {worst['score']}",
                     "Your real score timeline",
-                    [{"label": worst["exam"], "detail": f"Score {worst['score']} vs class {worst['classAverage']}"}],
+                    [
+                        {
+                            "label": worst["exam"],
+                            "detail": f"Score {worst['score']} vs class {worst['classAverage']}",
+                        }
+                    ],
                     {
                         "label": "Open my progress",
                         "to": "/my-progress",
@@ -321,15 +339,17 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
                                 "detail": f"{integrity['flaggedCount']} of {integrity['totalAttempts']} attempts",
                             }
                         ],
-                        {
-                            "label": "Open case list",
-                            "to": "/integrity",
-                            "confirmTitle": "Open the case list?",
-                            "confirmBody": "Opens the monitoring log. No case status changes.",
-                            "confirmLabel": "Open case list",
-                        }
-                        if integrity["flaggedCount"]
-                        else None,
+                        (
+                            {
+                                "label": "Open case list",
+                                "to": "/integrity",
+                                "confirmTitle": "Open the case list?",
+                                "confirmBody": "Opens the monitoring log. No case status changes.",
+                                "confirmLabel": "Open case list",
+                            }
+                            if integrity["flaggedCount"]
+                            else None
+                        ),
                     )
                 )
         else:
@@ -345,7 +365,12 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
                         0.2,
                         f"{top['exam']} question {top['number']} flagged — schedule an item review with faculty",
                         "Current item analysis",
-                        [{"label": f"Q{top['number']}", "detail": f"Discrimination {top['discriminationIndex']}"}],
+                        [
+                            {
+                                "label": f"Q{top['number']}",
+                                "detail": f"Discrimination {top['discriminationIndex']}",
+                            }
+                        ],
                         {
                             "label": "Open item analysis",
                             "to": "/item-analysis",
@@ -360,7 +385,9 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
     if role == "academic_affairs":
         performance = data.get("performance") or {}
         participation = data.get("participation") or {}
-        below_pass = [r for r in performance.get("ranked") or [] if r["status"] == "Fail"]
+        below_pass = [
+            r for r in performance.get("ranked") or [] if r["status"] == "Fail"
+        ]
         if below_pass:
             items.append(
                 _structured_recommendation(
@@ -371,7 +398,12 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
                     0,
                     f"Follow up with {len(below_pass)} student(s) below the pass mark",
                     "Current student performance",
-                    [{"label": "Below pass", "detail": f"{len(below_pass)} students this term"}],
+                    [
+                        {
+                            "label": "Below pass",
+                            "detail": f"{len(below_pass)} students this term",
+                        }
+                    ],
                     {
                         "label": "Open student performance",
                         "to": "/performance",
@@ -393,7 +425,12 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
                     90,
                     f"Review {weakest_att['course']} attendance ({weakest_att['attendance']}%)",
                     "Current attendance by curriculum",
-                    [{"label": weakest_att["course"], "detail": f"{weakest_att['attendance']}% attendance"}],
+                    [
+                        {
+                            "label": weakest_att["course"],
+                            "detail": f"{weakest_att['attendance']}% attendance",
+                        }
+                    ],
                     {
                         "label": "Open attendance",
                         "to": "/participation",
@@ -445,7 +482,12 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
                     0.2,
                     f"Question {top['number']} on {top['exam']} flagged for review — low discrimination index",
                     "Current item analysis",
-                    [{"label": f"Q{top['number']}", "detail": f"Discrimination {top['discriminationIndex']}"}],
+                    [
+                        {
+                            "label": f"Q{top['number']}",
+                            "detail": f"Discrimination {top['discriminationIndex']}",
+                        }
+                    ],
                     {
                         "label": "Open in Item Analysis",
                         "to": "/item-analysis",
@@ -491,7 +533,12 @@ def _recommendations_from_context(role: str, data: dict[str, Any], insight_id: s
                     0,
                     f"{report['flaggedCount']} of {report['totalAttempts']} monitored attempts are currently flagged",
                     "Current integrity monitoring",
-                    [{"label": "Flagged", "detail": f"{report['flaggedCount']} of {report['totalAttempts']}"}],
+                    [
+                        {
+                            "label": "Flagged",
+                            "detail": f"{report['flaggedCount']} of {report['totalAttempts']}",
+                        }
+                    ],
                     None,
                 )
             )
@@ -535,7 +582,10 @@ async def get_ai_decision(
     filters: AnalyticsFilters,
     insight_id: str = "insight",
 ) -> dict:
-    year_id = await db.fetchval("SELECT id FROM academic_years WHERE is_current LIMIT 1") or ""
+    year_id = (
+        await db.fetchval("SELECT id FROM academic_years WHERE is_current LIMIT 1")
+        or ""
+    )
     term_id = ""
     if year_id:
         term_id = (
@@ -572,12 +622,16 @@ async def get_ai_decision(
     return result
 
 
-async def get_insight(ctx: UserContext, db: asyncpg.Connection, filters: AnalyticsFilters | None = None):
+async def get_insight(
+    ctx: UserContext, db: asyncpg.Connection, filters: AnalyticsFilters | None = None
+):
     decision = await get_ai_decision(ctx, db, filters or AnalyticsFilters())
     return decision.get("insight")
 
 
-async def get_prediction(ctx: UserContext, db: asyncpg.Connection, filters: AnalyticsFilters | None = None):
+async def get_prediction(
+    ctx: UserContext, db: asyncpg.Connection, filters: AnalyticsFilters | None = None
+):
     decision = await get_ai_decision(ctx, db, filters or AnalyticsFilters())
     return decision.get("prediction")
 

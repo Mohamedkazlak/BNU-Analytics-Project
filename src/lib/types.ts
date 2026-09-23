@@ -149,8 +149,41 @@ export interface ManagementOverview {
     passRate: number;
     participants: number;
     courses: number;
+    attendance: number;
+    participation: number;
+    expected: number;
+    onTime: number;
+    late: number;
+    absent: number;
+    passed: number;
+    failed: number;
   }[];
-  activityTrend: { month: string; exams: number; participants: number }[];
+  activityTrend: {
+    month: string;
+    exams: number;
+    participants: number;
+    year?: number;
+    monthNum?: number;
+    termId?: string;
+    termName?: string;
+  }[];
+  examSummaries?: {
+    examId: string;
+    title: string;
+    course: string;
+    college: string;
+    termId?: string;
+    termName?: string;
+    month?: string;
+    year?: number;
+    monthNum?: number;
+    sittings: number;
+    passed: number;
+    failed: number;
+    absent: number;
+    late: number;
+    avgScore: number;
+  }[];
   insight: string;
   containsSynthetic?: boolean;
 }
@@ -244,12 +277,19 @@ export interface ParticipationReport {
 }
 
 export interface CoursePerformanceReport {
-  averageByCourse: { course: string; average: number; quality: number }[];
+  averageByCourse: {
+    course: string;
+    courseCode?: string;
+    average: number;
+    quality: number;
+  }[];
   sections: {
     section: string;
     course: string;
+    courseCode?: string;
     average: number;
     passRate: number;
+    enrolled?: number;
   }[];
   assignedCourses?: {
     id: string;

@@ -10,7 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AcademicAffairsRouteImport } from './routes/academic-affairs'
+import { Route as RoleRouteImport } from './routes/$role'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as ExamActivityRouteImport } from './routes/exam-activity'
 import { Route as IntegrityRouteImport } from './routes/integrity'
@@ -20,20 +20,28 @@ import { Route as ManagementRouteImport } from './routes/management'
 import { Route as MyProgressRouteImport } from './routes/my-progress'
 import { Route as ParticipationRouteImport } from './routes/participation'
 import { Route as PerformanceRouteImport } from './routes/performance'
-import { Route as ProfessorRouteImport } from './routes/professor'
-import { Route as ProgramDirectorRouteImport } from './routes/program-director'
 import { Route as RealTimeRouteImport } from './routes/real-time'
+import { Route as RoleIndexRouteImport } from './routes/$role.index'
+import { Route as RoleCoursesRouteImport } from './routes/$role.courses'
+import { Route as RoleExamActivityRouteImport } from './routes/$role.exam-activity'
+import { Route as RoleIntegrityRouteImport } from './routes/$role.integrity'
+import { Route as RoleItemAnalysisRouteImport } from './routes/$role.item-analysis'
+import { Route as RoleParticipationRouteImport } from './routes/$role.participation'
+import { Route as RolePerformanceRouteImport } from './routes/$role.performance'
+import { Route as RoleRealTimeRouteImport } from './routes/$role.real-time'
 import { Route as StudentsIndexRouteImport } from './routes/students.index'
 import { Route as StudentsStudentIdRouteImport } from './routes/students.$studentId'
+import { Route as RoleStudentsIndexRouteImport } from './routes/$role.students.index'
+import { Route as RoleStudentsStudentIdRouteImport } from './routes/$role.students.$studentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AcademicAffairsRoute = AcademicAffairsRouteImport.update({
-  id: '/academic-affairs',
-  path: '/academic-affairs',
+const RoleRoute = RoleRouteImport.update({
+  id: '/$role',
+  path: '/$role',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CoursesRoute = CoursesRouteImport.update({
@@ -81,20 +89,50 @@ const PerformanceRoute = PerformanceRouteImport.update({
   path: '/performance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProfessorRoute = ProfessorRouteImport.update({
-  id: '/professor',
-  path: '/professor',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProgramDirectorRoute = ProgramDirectorRouteImport.update({
-  id: '/program-director',
-  path: '/program-director',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const RealTimeRoute = RealTimeRouteImport.update({
   id: '/real-time',
   path: '/real-time',
   getParentRoute: () => rootRouteImport,
+} as any)
+const RoleIndexRoute = RoleIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => RoleRoute,
+} as any)
+const RoleCoursesRoute = RoleCoursesRouteImport.update({
+  id: '/courses',
+  path: '/courses',
+  getParentRoute: () => RoleRoute,
+} as any)
+const RoleExamActivityRoute = RoleExamActivityRouteImport.update({
+  id: '/exam-activity',
+  path: '/exam-activity',
+  getParentRoute: () => RoleRoute,
+} as any)
+const RoleIntegrityRoute = RoleIntegrityRouteImport.update({
+  id: '/integrity',
+  path: '/integrity',
+  getParentRoute: () => RoleRoute,
+} as any)
+const RoleItemAnalysisRoute = RoleItemAnalysisRouteImport.update({
+  id: '/item-analysis',
+  path: '/item-analysis',
+  getParentRoute: () => RoleRoute,
+} as any)
+const RoleParticipationRoute = RoleParticipationRouteImport.update({
+  id: '/participation',
+  path: '/participation',
+  getParentRoute: () => RoleRoute,
+} as any)
+const RolePerformanceRoute = RolePerformanceRouteImport.update({
+  id: '/performance',
+  path: '/performance',
+  getParentRoute: () => RoleRoute,
+} as any)
+const RoleRealTimeRoute = RoleRealTimeRouteImport.update({
+  id: '/real-time',
+  path: '/real-time',
+  getParentRoute: () => RoleRoute,
 } as any)
 const StudentsIndexRoute = StudentsIndexRouteImport.update({
   id: '/students/',
@@ -106,10 +144,20 @@ const StudentsStudentIdRoute = StudentsStudentIdRouteImport.update({
   path: '/students/$studentId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RoleStudentsIndexRoute = RoleStudentsIndexRouteImport.update({
+  id: '/students/',
+  path: '/students/',
+  getParentRoute: () => RoleRoute,
+} as any)
+const RoleStudentsStudentIdRoute = RoleStudentsStudentIdRouteImport.update({
+  id: '/students/$studentId',
+  path: '/students/$studentId',
+  getParentRoute: () => RoleRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/academic-affairs': typeof AcademicAffairsRoute
+  '/$role': typeof RoleRouteWithChildren
   '/courses': typeof CoursesRoute
   '/exam-activity': typeof ExamActivityRoute
   '/integrity': typeof IntegrityRoute
@@ -119,15 +167,22 @@ export interface FileRoutesByFullPath {
   '/my-progress': typeof MyProgressRoute
   '/participation': typeof ParticipationRoute
   '/performance': typeof PerformanceRoute
-  '/professor': typeof ProfessorRoute
-  '/program-director': typeof ProgramDirectorRoute
   '/real-time': typeof RealTimeRoute
+  '/$role/courses': typeof RoleCoursesRoute
+  '/$role/exam-activity': typeof RoleExamActivityRoute
+  '/$role/integrity': typeof RoleIntegrityRoute
+  '/$role/item-analysis': typeof RoleItemAnalysisRoute
+  '/$role/participation': typeof RoleParticipationRoute
+  '/$role/performance': typeof RolePerformanceRoute
+  '/$role/real-time': typeof RoleRealTimeRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
+  '/$role/': typeof RoleIndexRoute
   '/students/': typeof StudentsIndexRoute
+  '/$role/students/$studentId': typeof RoleStudentsStudentIdRoute
+  '/$role/students/': typeof RoleStudentsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/academic-affairs': typeof AcademicAffairsRoute
   '/courses': typeof CoursesRoute
   '/exam-activity': typeof ExamActivityRoute
   '/integrity': typeof IntegrityRoute
@@ -137,16 +192,24 @@ export interface FileRoutesByTo {
   '/my-progress': typeof MyProgressRoute
   '/participation': typeof ParticipationRoute
   '/performance': typeof PerformanceRoute
-  '/professor': typeof ProfessorRoute
-  '/program-director': typeof ProgramDirectorRoute
   '/real-time': typeof RealTimeRoute
+  '/$role/courses': typeof RoleCoursesRoute
+  '/$role/exam-activity': typeof RoleExamActivityRoute
+  '/$role/integrity': typeof RoleIntegrityRoute
+  '/$role/item-analysis': typeof RoleItemAnalysisRoute
+  '/$role/participation': typeof RoleParticipationRoute
+  '/$role/performance': typeof RolePerformanceRoute
+  '/$role/real-time': typeof RoleRealTimeRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
+  '/$role': typeof RoleIndexRoute
   '/students': typeof StudentsIndexRoute
+  '/$role/students/$studentId': typeof RoleStudentsStudentIdRoute
+  '/$role/students': typeof RoleStudentsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/academic-affairs': typeof AcademicAffairsRoute
+  '/$role': typeof RoleRouteWithChildren
   '/courses': typeof CoursesRoute
   '/exam-activity': typeof ExamActivityRoute
   '/integrity': typeof IntegrityRoute
@@ -156,17 +219,25 @@ export interface FileRoutesById {
   '/my-progress': typeof MyProgressRoute
   '/participation': typeof ParticipationRoute
   '/performance': typeof PerformanceRoute
-  '/professor': typeof ProfessorRoute
-  '/program-director': typeof ProgramDirectorRoute
   '/real-time': typeof RealTimeRoute
+  '/$role/courses': typeof RoleCoursesRoute
+  '/$role/exam-activity': typeof RoleExamActivityRoute
+  '/$role/integrity': typeof RoleIntegrityRoute
+  '/$role/item-analysis': typeof RoleItemAnalysisRoute
+  '/$role/participation': typeof RoleParticipationRoute
+  '/$role/performance': typeof RolePerformanceRoute
+  '/$role/real-time': typeof RoleRealTimeRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
+  '/$role/': typeof RoleIndexRoute
   '/students/': typeof StudentsIndexRoute
+  '/$role/students/$studentId': typeof RoleStudentsStudentIdRoute
+  '/$role/students/': typeof RoleStudentsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/academic-affairs'
+    | '/$role'
     | '/courses'
     | '/exam-activity'
     | '/integrity'
@@ -176,15 +247,22 @@ export interface FileRouteTypes {
     | '/my-progress'
     | '/participation'
     | '/performance'
-    | '/professor'
-    | '/program-director'
     | '/real-time'
+    | '/$role/courses'
+    | '/$role/exam-activity'
+    | '/$role/integrity'
+    | '/$role/item-analysis'
+    | '/$role/participation'
+    | '/$role/performance'
+    | '/$role/real-time'
     | '/students/$studentId'
+    | '/$role/'
     | '/students/'
+    | '/$role/students/$studentId'
+    | '/$role/students/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/academic-affairs'
     | '/courses'
     | '/exam-activity'
     | '/integrity'
@@ -194,15 +272,23 @@ export interface FileRouteTypes {
     | '/my-progress'
     | '/participation'
     | '/performance'
-    | '/professor'
-    | '/program-director'
     | '/real-time'
+    | '/$role/courses'
+    | '/$role/exam-activity'
+    | '/$role/integrity'
+    | '/$role/item-analysis'
+    | '/$role/participation'
+    | '/$role/performance'
+    | '/$role/real-time'
     | '/students/$studentId'
+    | '/$role'
     | '/students'
+    | '/$role/students/$studentId'
+    | '/$role/students'
   id:
     | '__root__'
     | '/'
-    | '/academic-affairs'
+    | '/$role'
     | '/courses'
     | '/exam-activity'
     | '/integrity'
@@ -212,16 +298,24 @@ export interface FileRouteTypes {
     | '/my-progress'
     | '/participation'
     | '/performance'
-    | '/professor'
-    | '/program-director'
     | '/real-time'
+    | '/$role/courses'
+    | '/$role/exam-activity'
+    | '/$role/integrity'
+    | '/$role/item-analysis'
+    | '/$role/participation'
+    | '/$role/performance'
+    | '/$role/real-time'
     | '/students/$studentId'
+    | '/$role/'
     | '/students/'
+    | '/$role/students/$studentId'
+    | '/$role/students/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AcademicAffairsRoute: typeof AcademicAffairsRoute
+  RoleRoute: typeof RoleRouteWithChildren
   CoursesRoute: typeof CoursesRoute
   ExamActivityRoute: typeof ExamActivityRoute
   IntegrityRoute: typeof IntegrityRoute
@@ -231,8 +325,6 @@ export interface RootRouteChildren {
   MyProgressRoute: typeof MyProgressRoute
   ParticipationRoute: typeof ParticipationRoute
   PerformanceRoute: typeof PerformanceRoute
-  ProfessorRoute: typeof ProfessorRoute
-  ProgramDirectorRoute: typeof ProgramDirectorRoute
   RealTimeRoute: typeof RealTimeRoute
   StudentsStudentIdRoute: typeof StudentsStudentIdRoute
   StudentsIndexRoute: typeof StudentsIndexRoute
@@ -247,11 +339,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/academic-affairs': {
-      id: '/academic-affairs'
-      path: '/academic-affairs'
-      fullPath: '/academic-affairs'
-      preLoaderRoute: typeof AcademicAffairsRouteImport
+    '/$role': {
+      id: '/$role'
+      path: '/$role'
+      fullPath: '/$role'
+      preLoaderRoute: typeof RoleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/courses': {
@@ -317,26 +409,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PerformanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/professor': {
-      id: '/professor'
-      path: '/professor'
-      fullPath: '/professor'
-      preLoaderRoute: typeof ProfessorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/program-director': {
-      id: '/program-director'
-      path: '/program-director'
-      fullPath: '/program-director'
-      preLoaderRoute: typeof ProgramDirectorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/real-time': {
       id: '/real-time'
       path: '/real-time'
       fullPath: '/real-time'
       preLoaderRoute: typeof RealTimeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/$role/': {
+      id: '/$role/'
+      path: '/'
+      fullPath: '/$role/'
+      preLoaderRoute: typeof RoleIndexRouteImport
+      parentRoute: typeof RoleRoute
+    }
+    '/$role/courses': {
+      id: '/$role/courses'
+      path: '/courses'
+      fullPath: '/$role/courses'
+      preLoaderRoute: typeof RoleCoursesRouteImport
+      parentRoute: typeof RoleRoute
+    }
+    '/$role/exam-activity': {
+      id: '/$role/exam-activity'
+      path: '/exam-activity'
+      fullPath: '/$role/exam-activity'
+      preLoaderRoute: typeof RoleExamActivityRouteImport
+      parentRoute: typeof RoleRoute
+    }
+    '/$role/integrity': {
+      id: '/$role/integrity'
+      path: '/integrity'
+      fullPath: '/$role/integrity'
+      preLoaderRoute: typeof RoleIntegrityRouteImport
+      parentRoute: typeof RoleRoute
+    }
+    '/$role/item-analysis': {
+      id: '/$role/item-analysis'
+      path: '/item-analysis'
+      fullPath: '/$role/item-analysis'
+      preLoaderRoute: typeof RoleItemAnalysisRouteImport
+      parentRoute: typeof RoleRoute
+    }
+    '/$role/participation': {
+      id: '/$role/participation'
+      path: '/participation'
+      fullPath: '/$role/participation'
+      preLoaderRoute: typeof RoleParticipationRouteImport
+      parentRoute: typeof RoleRoute
+    }
+    '/$role/performance': {
+      id: '/$role/performance'
+      path: '/performance'
+      fullPath: '/$role/performance'
+      preLoaderRoute: typeof RolePerformanceRouteImport
+      parentRoute: typeof RoleRoute
+    }
+    '/$role/real-time': {
+      id: '/$role/real-time'
+      path: '/real-time'
+      fullPath: '/$role/real-time'
+      preLoaderRoute: typeof RoleRealTimeRouteImport
+      parentRoute: typeof RoleRoute
     }
     '/students/': {
       id: '/students/'
@@ -352,12 +486,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentsStudentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$role/students/': {
+      id: '/$role/students/'
+      path: '/students'
+      fullPath: '/$role/students/'
+      preLoaderRoute: typeof RoleStudentsIndexRouteImport
+      parentRoute: typeof RoleRoute
+    }
+    '/$role/students/$studentId': {
+      id: '/$role/students/$studentId'
+      path: '/students/$studentId'
+      fullPath: '/$role/students/$studentId'
+      preLoaderRoute: typeof RoleStudentsStudentIdRouteImport
+      parentRoute: typeof RoleRoute
+    }
   }
 }
 
+interface RoleRouteChildren {
+  RoleCoursesRoute: typeof RoleCoursesRoute
+  RoleExamActivityRoute: typeof RoleExamActivityRoute
+  RoleIntegrityRoute: typeof RoleIntegrityRoute
+  RoleItemAnalysisRoute: typeof RoleItemAnalysisRoute
+  RoleParticipationRoute: typeof RoleParticipationRoute
+  RolePerformanceRoute: typeof RolePerformanceRoute
+  RoleRealTimeRoute: typeof RoleRealTimeRoute
+  RoleIndexRoute: typeof RoleIndexRoute
+  RoleStudentsStudentIdRoute: typeof RoleStudentsStudentIdRoute
+  RoleStudentsIndexRoute: typeof RoleStudentsIndexRoute
+}
+
+const RoleRouteChildren: RoleRouteChildren = {
+  RoleCoursesRoute: RoleCoursesRoute,
+  RoleExamActivityRoute: RoleExamActivityRoute,
+  RoleIntegrityRoute: RoleIntegrityRoute,
+  RoleItemAnalysisRoute: RoleItemAnalysisRoute,
+  RoleParticipationRoute: RoleParticipationRoute,
+  RolePerformanceRoute: RolePerformanceRoute,
+  RoleRealTimeRoute: RoleRealTimeRoute,
+  RoleIndexRoute: RoleIndexRoute,
+  RoleStudentsStudentIdRoute: RoleStudentsStudentIdRoute,
+  RoleStudentsIndexRoute: RoleStudentsIndexRoute,
+}
+
+const RoleRouteWithChildren = RoleRoute._addFileChildren(RoleRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AcademicAffairsRoute: AcademicAffairsRoute,
+  RoleRoute: RoleRouteWithChildren,
   CoursesRoute: CoursesRoute,
   ExamActivityRoute: ExamActivityRoute,
   IntegrityRoute: IntegrityRoute,
@@ -367,8 +543,6 @@ const rootRouteChildren: RootRouteChildren = {
   MyProgressRoute: MyProgressRoute,
   ParticipationRoute: ParticipationRoute,
   PerformanceRoute: PerformanceRoute,
-  ProfessorRoute: ProfessorRoute,
-  ProgramDirectorRoute: ProgramDirectorRoute,
   RealTimeRoute: RealTimeRoute,
   StudentsStudentIdRoute: StudentsStudentIdRoute,
   StudentsIndexRoute: StudentsIndexRoute,

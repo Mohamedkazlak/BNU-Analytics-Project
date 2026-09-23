@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AiDecisionSection } from "@/components/ai-insights";
 import { ScopeBanner } from "@/components/dashboard/scope-banner";
@@ -13,32 +12,10 @@ import {
   TableShell,
   Th,
 } from "@/components/dashboard/dashboard-ui";
-import { roleGuard } from "@/lib/auth/role-guards";
 import { useRole } from "@/components/role-context";
 import { useFilteredQuery } from "@/components/dashboard/use-analytics-filters";
 
-export const Route = createFileRoute("/professor")({
-  beforeLoad: roleGuard("/professor"),
-  head: () => ({
-    meta: [
-      { title: "Professor Course Dashboard — BNU" },
-      {
-        name: "description",
-        content:
-          "Course-scoped gradebook, attendance and AI insights for professors.",
-      },
-      { property: "og:title", content: "Professor Course Dashboard — BNU" },
-      {
-        property: "og:description",
-        content:
-          "Course-scoped gradebook, attendance and AI insights for professors.",
-      },
-    ],
-  }),
-  component: ProfessorShell,
-});
-
-function ProfessorShell() {
+export function ProfessorPage() {
   const { user } = useRole();
   const myCourses = user.courses ?? [];
   const { filters, filtersReady, queryKey, enabled } = useFilteredQuery(

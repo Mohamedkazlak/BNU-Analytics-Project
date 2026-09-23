@@ -23,6 +23,7 @@ async def get_management_overview(
             a.program AS college,
             COUNT(*) AS total_attempts,
             COUNT(*) FILTER (WHERE a.status <> 'absent') AS taken_attempts,
+            COUNT(*) FILTER (WHERE a.status <> 'absent' AND NOT a.late_start) AS on_time_attempts,
             COUNT(*) FILTER (WHERE a.status <> 'absent' AND a.score >= {PASS_MARK}) AS passed_attempts,
             COUNT(DISTINCT a.exam_id) AS total_exams,
             COUNT(DISTINCT a.course_id) AS courses
@@ -37,27 +38,77 @@ async def get_management_overview(
         (r for r in grain_rows if r["g_course"] == 1 and r["g_program"] == 1),
         None,
     )
-    taken_attempts = (stats["taken_attempts"] if stats else 0) or 0
-    total_attempts = (stats["total_attempts"] if stats else 0) or 0
-    passed_attempts = (stats["passed_attempts"] if stats else 0) or 0
     total_exams = (stats["total_exams"] if stats else 0) or 0
-    pass_rate = (passed_attempts / taken_attempts * 100) if taken_attempts else 0
-    completion = (taken_attempts / total_attempts * 100) if total_attempts else 0
+    courses_by_college = {
+        r["college"]: int(r["courses"] or 0) for r in grain_rows if r["g_program"] == 0
+    }
+
+    standing_rows = await db.fetch(
+        f"""
+        SELECT
+            grouping(s.college) AS g_college,
+            s.college,
+            COUNT(*) AS students,
+            COUNT(*) FILTER (WHERE s.sat > 0) AS sat,
+            COUNT(*) FILTER (
+                WHERE s.sat > 0 AND s.avg_score >= {PASS_MARK}
+            ) AS passed,
+            COUNT(*) FILTER (
+                WHERE s.sat > 0
+                  AND (s.avg_score IS NULL OR s.avg_score < {PASS_MARK})
+            ) AS failed,
+            COUNT(*) FILTER (
+                WHERE s.sat > 0 AND s.late = 0 AND s.absent = 0
+            ) AS on_time,
+            COUNT(*) FILTER (WHERE s.late > 0) AS late,
+            COUNT(*) FILTER (WHERE s.absent > 0) AS absent,
+            COUNT(*) FILTER (WHERE s.sat = s.expected) AS sat_all
+        FROM (
+            SELECT
+                a.program AS college,
+                a.student_id,
+                COUNT(*) AS expected,
+                COUNT(*) FILTER (WHERE a.status <> 'absent') AS sat,
+                COUNT(*) FILTER (
+                    WHERE a.status <> 'absent' AND a.late_start
+                ) AS late,
+                COUNT(*) FILTER (WHERE a.status = 'absent') AS absent,
+                AVG(a.score) FILTER (WHERE a.status <> 'absent') AS avg_score
+            FROM v_exam_attempts a
+            WHERE {where_sql}
+            GROUP BY a.program, a.student_id
+        ) s
+        GROUP BY GROUPING SETS ((s.college), ())
+        """,
+        *args,
+    )
+
+    university = next((r for r in standing_rows if r["g_college"] == 1), None)
+    students = int((university["sat"] if university else 0) or 0)
+    expected_students = int((university["students"] if university else 0) or 0)
+    passed_students = int((university["passed"] if university else 0) or 0)
+    on_time_students = int((university["on_time"] if university else 0) or 0)
+    pass_rate = (passed_students / students * 100) if students else 0
+    attendance = (
+        (on_time_students / expected_students * 100) if expected_students else 0
+    )
 
     kpis = [
         {"label": "Exams administered", "value": str(total_exams)},
-        {"label": "Total participants", "value": str(taken_attempts)},
-        {"label": "Average pass rate", "value": f"{pass_rate:.1f}%"},
-        {"label": "Completion rate", "value": f"{completion:.1f}%"},
+        {"label": "Students", "value": str(students)},
+        {"label": "Student pass rate", "value": f"{pass_rate:.1f}%"},
+        {"label": "Attendance", "value": f"{attendance:.1f}%"},
     ]
 
     pass_rate_by_course = [
         {
             "course": r["course"],
             "passRate": round(
-                (r["passed_attempts"] / r["taken_attempts"] * 100)
-                if r["taken_attempts"]
-                else 0,
+                (
+                    (r["passed_attempts"] / r["taken_attempts"] * 100)
+                    if r["taken_attempts"]
+                    else 0
+                ),
                 1,
             ),
             "participants": r["taken_attempts"],
@@ -65,36 +116,47 @@ async def get_management_overview(
         for r in grain_rows
         if r["g_course"] == 0
     ]
-    pass_rate_by_college = [
-        {
-            "college": r["college"],
-            "passRate": round(
-                (r["passed_attempts"] / r["taken_attempts"] * 100)
-                if r["taken_attempts"]
-                else 0,
-                1,
-            ),
-            "participants": r["taken_attempts"],
-            "courses": r["courses"],
-        }
-        for r in grain_rows
-        if r["g_program"] == 0
-    ]
+    pass_rate_by_college = []
+    for r in standing_rows:
+        if r["g_college"] != 0:
+            continue
+        expected = int(r["students"] or 0)
+        sat = int(r["sat"] or 0)
+        passed = int(r["passed"] or 0)
+        on_time = int(r["on_time"] or 0)
+        sat_all_college = int(r["sat_all"] or 0)
+        pass_rate_by_college.append(
+            {
+                "college": r["college"],
+                "passRate": round((passed / sat * 100) if sat else 0, 1),
+                "participants": sat,
+                "courses": courses_by_college.get(r["college"], 0),
+                "attendance": round((on_time / expected * 100) if expected else 0, 1),
+                "participation": round(
+                    (sat_all_college / expected * 100) if expected else 0, 1
+                ),
+                "expected": expected,
+                "onTime": on_time,
+                "late": int(r["late"] or 0),
+                "absent": int(r["absent"] or 0),
+                "passed": passed,
+                "failed": int(r["failed"] or 0),
+            }
+        )
 
-    timeline_where, timeline_args, next_i = attempt_where(filters, start=1, alias="a")
-    student_clause = ""
-    if filters.student_id:
-        student_clause = f" AND (a.student_id = ${next_i} OR a.student_id IS NULL)"
-        # student filter already in timeline_where via alias a on left join
     timeline_rows = await db.fetch(
-        f"""
+        """
         SELECT
             to_char(date_trunc('month', x.scheduled_at), 'Mon') AS month,
+            extract(year FROM x.scheduled_at)::int AS year,
             extract(month FROM x.scheduled_at)::int AS month_num,
+            t.id AS term_id,
+            t.name AS term_name,
             count(DISTINCT x.id) AS exams,
-            count(*) FILTER (WHERE a.status <> 'absent') AS participants
+            count(DISTINCT a.student_id) FILTER (WHERE a.status <> 'absent') AS participants
         FROM exams x
         JOIN course_offerings o ON o.id = x.offering_id
+        JOIN terms t ON t.id = o.term_id
         JOIN courses c ON c.id = o.course_id
         JOIN org_units p ON p.id = c.program_id
         JOIN org_units sec ON sec.id = p.parent_id
@@ -110,8 +172,8 @@ async def get_management_overview(
               WHERE sca.staff_person_id = $5 AND sca.course_id = c.id
             )
           )
-        GROUP BY 1, 2
-        ORDER BY 2
+        GROUP BY 1, 2, 3, 4, 5
+        ORDER BY 2, 3
         """,
         filters.sector_id,
         filters.college_id,
@@ -120,8 +182,84 @@ async def get_management_overview(
         filters.professor_id,
     )
     timeline = [
-        {"month": r["month"], "exams": r["exams"], "participants": r["participants"]}
+        {
+            "month": r["month"],
+            "exams": r["exams"],
+            "participants": r["participants"],
+            "year": r["year"],
+            "monthNum": r["month_num"],
+            "termId": r["term_id"],
+            "termName": r["term_name"],
+        }
         for r in timeline_rows
+    ]
+
+    exam_rows = await db.fetch(
+        f"""
+        SELECT
+            a.exam_id,
+            a.exam_title,
+            a.course_code,
+            a.program AS college,
+            t.id AS term_id,
+            t.name AS term_name,
+            to_char(date_trunc('month', a.scheduled_at), 'Mon') AS month,
+            extract(year FROM a.scheduled_at)::int AS year,
+            extract(month FROM a.scheduled_at)::int AS month_num,
+            COUNT(*) FILTER (WHERE a.status <> 'absent') AS sittings,
+            COUNT(*) FILTER (
+                WHERE a.status <> 'absent' AND a.score >= {PASS_MARK}
+            ) AS passed,
+            COUNT(*) FILTER (
+                WHERE a.status <> 'absent'
+                  AND (a.score IS NULL OR a.score < {PASS_MARK})
+            ) AS failed,
+            COUNT(*) FILTER (WHERE a.status = 'absent') AS absent,
+            COUNT(*) FILTER (
+                WHERE a.status <> 'absent' AND a.late_start
+            ) AS late,
+            ROUND(
+                AVG(a.score) FILTER (WHERE a.status <> 'absent')::numeric,
+                1
+            ) AS avg_score
+        FROM v_exam_attempts a
+        JOIN exams x ON x.id = a.exam_id
+        JOIN course_offerings o ON o.id = x.offering_id
+        JOIN terms t ON t.id = o.term_id
+        WHERE {where_sql}
+        GROUP BY
+            a.exam_id,
+            a.exam_title,
+            a.course_code,
+            a.program,
+            t.id,
+            t.name,
+            extract(year FROM a.scheduled_at),
+            extract(month FROM a.scheduled_at),
+            to_char(date_trunc('month', a.scheduled_at), 'Mon')
+        ORDER BY MIN(a.scheduled_at), a.course_code
+        """,
+        *args,
+    )
+    exam_summaries = [
+        {
+            "examId": r["exam_id"],
+            "title": r["exam_title"],
+            "course": r["course_code"],
+            "college": r["college"],
+            "termId": r["term_id"],
+            "termName": r["term_name"],
+            "month": r["month"],
+            "year": r["year"],
+            "monthNum": r["month_num"],
+            "sittings": int(r["sittings"] or 0),
+            "passed": int(r["passed"] or 0),
+            "failed": int(r["failed"] or 0),
+            "absent": int(r["absent"] or 0),
+            "late": int(r["late"] or 0),
+            "avgScore": float(r["avg_score"] or 0),
+        }
+        for r in exam_rows
     ]
 
     if not pass_rate_by_college:
@@ -129,15 +267,15 @@ async def get_management_overview(
     elif len(pass_rate_by_college) == 1:
         only = pass_rate_by_college[0]
         insight = (
-            f"{only['college']} pass rate is {only['passRate']}% across "
-            f"{only['courses']} courses in this view."
+            f"{only['college']} student pass rate is {only['passRate']}% across "
+            f"{only['participants']} students in this view."
         )
     else:
         weakest = min(pass_rate_by_college, key=lambda r: r["passRate"])
         strongest = max(pass_rate_by_college, key=lambda r: r["passRate"])
         insight = (
-            f"{weakest['college']} is the weakest college in this view at "
-            f"{weakest['passRate']}%, while {strongest['college']} leads at "
+            f"{weakest['college']} has the lowest student pass rate in this view "
+            f"at {weakest['passRate']}%, while {strongest['college']} leads at "
             f"{strongest['passRate']}%."
         )
 
@@ -160,6 +298,7 @@ async def get_management_overview(
         "passRateByCourse": pass_rate_by_course,
         "passRateByCollege": pass_rate_by_college,
         "activityTrend": timeline,
+        "examSummaries": exam_summaries,
         "insight": insight,
         "containsSynthetic": contains_synthetic,
     }

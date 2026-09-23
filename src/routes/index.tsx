@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { getActiveDemoRole, roleGuard, roleHome } from "@/lib/auth/role-guards";
+import { getActiveDemoRole, ROLE_SLUG } from "@/lib/auth/role-guards";
 
 export const Route = createFileRoute("/")({
   beforeLoad: () => {
@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({
     if (!role) {
       throw redirect({ to: "/login" });
     }
-    throw redirect({ to: roleHome[role] });
+    throw redirect({ to: "/$role", params: { role: ROLE_SLUG[role] } });
   },
   component: () => null,
 });

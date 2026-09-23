@@ -4,13 +4,20 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getFilterOptions } from "@/lib/api";
 import {
+  applyFilterSearch,
+  defaultVisible,
   emptyFilters,
+  fromSearchParams,
+  hasFilterValues,
+  sameFilters,
   sanitizeFilters,
   setFilterCollege,
   setFilterCurriculum,
@@ -21,7 +28,6 @@ import {
   type FilterOptionsResponse,
 } from "@/lib/filter-types";
 import { useRole } from "@/components/role-context";
-import { defaultVisible } from "@/lib/filter-types";
 
 interface AnalyticsFilterContextValue {
   filters: AnalyticsFilters;
@@ -40,17 +46,6 @@ interface AnalyticsFilterContextValue {
 const AnalyticsFilterContext =
   createContext<AnalyticsFilterContextValue | null>(null);
 
-function readStored(userId: string): AnalyticsFilters {
-  if (typeof window === "undefined" || !userId) return emptyFilters();
-  try {
-    const raw = sessionStorage.getItem(`bnu.analyticsFilters.${userId}`);
-    if (!raw) return emptyFilters();
-    return JSON.parse(raw) as AnalyticsFilters;
-  } catch {
-    return emptyFilters();
-  }
-}
-
 function writeStored(userId: string, filters: AnalyticsFilters) {
   if (typeof window === "undefined" || !userId) return;
   sessionStorage.setItem(
@@ -59,27 +54,63 @@ function writeStored(userId: string, filters: AnalyticsFilters) {
   );
 }
 
-function sameFilters(a: AnalyticsFilters, b: AnalyticsFilters): boolean {
-  return (
-    a.sectorId === b.sectorId &&
-    a.collegeId === b.collegeId &&
-    a.curriculumId === b.curriculumId &&
-    a.studentId === b.studentId &&
-    a.professorId === b.professorId
-  );
-}
-
 export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
   const { user, role, viewer } = useRole();
-  const [filters, setFilters] = useState<AnalyticsFilters>(() =>
-    readStored(user.id),
-  );
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const searchStr = useRouterState({
+    select: (s) => s.location.searchStr ?? "",
+  });
+  const [filters, setFilters] = useState<AnalyticsFilters>(() => {
+    const visible = defaultVisible(role, viewer.level);
+    return sanitizeFilters(fromSearchParams(searchStr), visible);
+  });
   const [studentQuery, setStudentQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const lastPathname = useRef(pathname);
+
+  const persist = useCallback(
+    (next: AnalyticsFilters) => {
+      setFilters(next);
+      writeStored(user.id, next);
+      if (pathname === "/login") return;
+      void navigate({
+        to: ".",
+        replace: true,
+        resetScroll: false,
+        search: (prev) => applyFilterSearch(prev, next),
+      });
+    },
+    [navigate, pathname, user.id],
+  );
 
   useEffect(() => {
-    setFilters(readStored(user.id));
+    const visible = defaultVisible(role, viewer.level);
+    setFilters(sanitizeFilters(fromSearchParams(searchStr), visible));
+    // URL is read at user switch time; address-bar edits are handled below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
+
+  useEffect(() => {
+    const fromUrl = fromSearchParams(searchStr);
+    setFilters((current) => {
+      if (sameFilters(current, fromUrl)) return current;
+      writeStored(user.id, fromUrl);
+      return fromUrl;
+    });
+  }, [searchStr, user.id]);
+
+  useEffect(() => {
+    if (lastPathname.current === pathname) return;
+    lastPathname.current = pathname;
+    setStudentQuery("");
+    setDebouncedQuery("");
+    const fromUrl = fromSearchParams(searchStr);
+    if (hasFilterValues(fromUrl)) return;
+    const cleared = emptyFilters();
+    setFilters(cleared);
+    writeStored(user.id, cleared);
+  }, [pathname, searchStr, user.id]);
 
   useEffect(() => {
     const handle = window.setTimeout(
@@ -88,14 +119,6 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
     );
     return () => window.clearTimeout(handle);
   }, [studentQuery]);
-
-  const persist = useCallback(
-    (next: AnalyticsFilters) => {
-      setFilters(next);
-      writeStored(user.id, next);
-    },
-    [user.id],
-  );
 
   const optionsQuery = useQuery({
     queryKey: [
@@ -114,13 +137,9 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const visible = defaultVisible(role, viewer.level);
-    setFilters((current) => {
-      const next = sanitizeFilters(current, visible);
-      if (sameFilters(current, next)) return current;
-      writeStored(user.id, next);
-      return next;
-    });
-  }, [role, viewer.level, user.id]);
+    const next = sanitizeFilters(filters, visible);
+    if (!sameFilters(filters, next)) persist(next);
+  }, [filters, persist, role, viewer.level]);
 
   const setSectorId = useCallback(
     (id: string) => {
@@ -130,9 +149,12 @@ export function AnalyticsFilterProvider({ children }: { children: ReactNode }) {
   );
   const setCollegeId = useCallback(
     (id: string) => {
-      persist(setFilterCollege(filters, id));
+      const collegeSectorId = options?.colleges.find(
+        (c) => c.id === id,
+      )?.parentId;
+      persist(setFilterCollege(filters, id, collegeSectorId ?? undefined));
     },
-    [persist, filters],
+    [persist, filters, options],
   );
   const setProfessorId = useCallback(
     (id: string) => {

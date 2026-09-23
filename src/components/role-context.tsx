@@ -49,7 +49,7 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
       group: "Overview",
       items: [
         {
-          to: "/management",
+          to: "/",
           label: "Institution Overview",
           title: "Senior Management Overview",
         },
@@ -106,7 +106,7 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
       group: "Overview",
       items: [
         {
-          to: "/program-director",
+          to: "/",
           label: "College Dashboard",
           title: "Program Director · College Dashboard",
         },
@@ -153,7 +153,7 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
       group: "College performance",
       items: [
         {
-          to: "/academic-affairs",
+          to: "/",
           label: "College Dashboard",
           title: "Academic Affairs · Student Performance & Attendance",
         },
@@ -195,7 +195,7 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
       group: "My courses",
       items: [
         {
-          to: "/professor",
+          to: "/",
           label: "Course Home",
           title: "Professor Course Dashboard",
         },
@@ -242,7 +242,7 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
       group: "Integrity",
       items: [
         {
-          to: "/integrity",
+          to: "/",
           label: "Flagged Cases",
           title: "Academic Integrity & Exam Monitoring",
         },
@@ -264,7 +264,7 @@ export const navByRole: Record<Role, { group: string; items: NavItem[] }[]> = {
       group: "My learning",
       items: [
         {
-          to: "/my-progress",
+          to: "/",
           label: "My Progress",
           title: "My Personal Dashboard",
         },

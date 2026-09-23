@@ -23,7 +23,7 @@ also not a security boundary.
 
 | Account | `user_accounts.role` | Typical `org_units.level` | UI filters | Org metadata visible via RLS |
 | --- | --- | --- | --- | --- |
-| University senior management | `senior_management` | `university` | Sector, College, Professor (all optional) | University, all sectors, all colleges |
+| University senior management | `senior_management` | `university` | Sector, College, Professor (all optional; Curricula requires college + professor) | University, all sectors, all colleges |
 | Sector dean | `senior_management` | `sector` | College, Professor (locked to own sector) | University, own sector, colleges in that sector |
 | Program director | `program_director` | `program` | Curriculum, Professor, Student (locked to own college) | University, parent sector, own college |
 | Academic affairs | `academic_affairs` | `program` | Same as program director | Same as program director |

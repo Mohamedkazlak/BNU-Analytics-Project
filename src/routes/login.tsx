@@ -1,6 +1,10 @@
 import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { roleRoutes, getActiveDemoRole } from "@/lib/auth/role-guards";
+import {
+  ROLE_SLUG,
+  getActiveDemoRole,
+  roleHome,
+} from "@/lib/auth/role-guards";
 import { setAuthToken } from "@/lib/auth/token";
 import { BACKEND_URL } from "@/lib/api";
 
@@ -8,7 +12,7 @@ const DEMO_ACCOUNT_GROUPS = [
   {
     heading: "Senior management",
     badge: "bg-blue-50 text-blue-700 ring-blue-700/10",
-    route: "/management",
+    route: "/senior-management",
     accounts: [
       { id: "u-president", title: "President", name: "Prof. Dr. Tamer Samir" },
       {
@@ -128,7 +132,7 @@ const DEMO_ACCOUNT_GROUPS = [
   {
     heading: "University offices",
     badge: "bg-red-50 text-red-700 ring-red-700/10",
-    route: "/integrity",
+    route: "/academic-integrity",
     accounts: [
       {
         id: "u-it-integrity",
@@ -140,7 +144,7 @@ const DEMO_ACCOUNT_GROUPS = [
   {
     heading: "Student",
     badge: "bg-green-50 text-green-700 ring-green-700/10",
-    route: "/my-progress",
+    route: "/student",
     accounts: [{ id: "u-student", title: "Student", name: "Student account" }],
   },
 ] as const;
@@ -150,7 +154,7 @@ export const Route = createFileRoute("/login")({
     if (typeof window === "undefined") return;
     const role = getActiveDemoRole();
     if (role) {
-      throw redirect({ to: roleRoutes[role] || "/" });
+      throw redirect({ to: "/$role", params: { role: ROLE_SLUG[role] } });
     }
   },
   component: Login,
@@ -166,7 +170,7 @@ function Login() {
   useEffect(() => {
     const role = getActiveDemoRole();
     if (role) {
-      void navigate({ to: roleRoutes[role] || "/" });
+      void navigate({ to: "/$role", params: { role: ROLE_SLUG[role] } });
     }
   }, [navigate]);
 
@@ -194,8 +198,10 @@ function Login() {
       });
       const me = await meRes.json();
 
-      const role = me.role as keyof typeof roleRoutes;
-      const targetRoute = roleRoutes[role] || "/my-progress";
+      const role = me.role as keyof typeof ROLE_SLUG;
+      const targetRoute = ROLE_SLUG[role]
+        ? roleHome(role)
+        : "/student";
       // Full navigation (not the SPA `navigate()`) so RoleProvider remounts
       // and re-reads the freshly-written token. RoleProvider's sync effect
       // only re-checks the token when its own derived role/user state

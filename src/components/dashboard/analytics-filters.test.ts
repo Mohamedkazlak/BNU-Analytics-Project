@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { defaultVisible } from "@/lib/filter-types";
 import {
   filterQueryKey,
+  fromSearchParams,
+  hasFilterValues,
+  sameFilters,
   sanitizeFilters,
   setFilterCollege,
   setFilterCurriculum,
@@ -20,7 +23,7 @@ describe("role-based-filter-visibility", () => {
     ]);
   });
 
-  it("hides Sector and shows College + Professor for a sector dean", () => {
+  it("hides Sector and shows College and Professor for a sector dean", () => {
     const visible = defaultVisible("senior_management", "sector");
     expect(visible).not.toContain("sector");
     expect(visible).toEqual(["college", "professor"]);
@@ -75,6 +78,26 @@ describe("analytics-filters parent clearing", () => {
       "col-b",
     );
     expect(next).toEqual({ sectorId: "sec-a", collegeId: "col-b" });
+  });
+
+  it("fills the sector from the selected college when none is set", () => {
+    const next = setFilterCollege({}, "col-vet", "sec-health");
+    expect(next).toEqual({
+      sectorId: "sec-health",
+      collegeId: "col-vet",
+    });
+  });
+
+  it("uses the college sector when it differs from the current sector", () => {
+    const next = setFilterCollege(
+      { sectorId: "sec-engineering" },
+      "col-vet",
+      "sec-health",
+    );
+    expect(next).toEqual({
+      sectorId: "sec-health",
+      collegeId: "col-vet",
+    });
   });
 
   it("clears curriculum and student when professor changes", () => {
@@ -153,6 +176,26 @@ describe("filter-query-keys", () => {
   it("serializes a stable query string", () => {
     expect(toSearchParams({ sectorId: "sec-a", collegeId: "col-a" })).toBe(
       "?sectorId=sec-a&collegeId=col-a",
+    );
+  });
+
+  it("parses filter IDs from the route query string", () => {
+    expect(fromSearchParams("?sectorId=sec-a&collegeId=col-a")).toEqual({
+      sectorId: "sec-a",
+      collegeId: "col-a",
+    });
+    expect(fromSearchParams({ sectorId: "sec-a", extra: 1 })).toEqual({
+      sectorId: "sec-a",
+    });
+    expect(fromSearchParams("")).toEqual({});
+  });
+
+  it("round-trips selected filters through the query string", () => {
+    const filters = { sectorId: "sec-a", collegeId: "col-a", studentId: "s7" };
+    expect(fromSearchParams(toSearchParams(filters))).toEqual(filters);
+    expect(hasFilterValues(filters)).toBe(true);
+    expect(sameFilters(filters, { ...filters, professorId: undefined })).toBe(
+      true,
     );
   });
 

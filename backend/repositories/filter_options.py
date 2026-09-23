@@ -2,6 +2,7 @@ import asyncpg
 
 from core.authorization import required_filter_fields, visible_filter_fields
 from repositories.accounts import load_auth_scope
+from repositories.sql_filters import professor_teaches_course_sql
 from schemas.auth import UserContext
 from schemas.filters import (
     AnalyticsFilters,
@@ -52,23 +53,20 @@ async def get_filter_options(
 
     if "college" in visible:
         sector_id = filters.sector_id or scope.sector_id
-        if not sector_id and "sector" in visible:
-            colleges = []
-        else:
-            rows = await db.fetch(
-                """
-                SELECT id, name, parent_id
-                FROM org_units
-                WHERE level = 'program'
-                  AND ($1::text IS NULL OR parent_id = $1)
-                ORDER BY name
-                """,
-                sector_id,
-            )
-            colleges = [
-                FilterOption(id=r["id"], name=r["name"], parentId=r["parent_id"])
-                for r in rows
-            ]
+        rows = await db.fetch(
+            """
+            SELECT id, name, parent_id
+            FROM org_units
+            WHERE level = 'program'
+              AND ($1::text IS NULL OR parent_id = $1)
+            ORDER BY name
+            """,
+            sector_id,
+        )
+        colleges = [
+            FilterOption(id=r["id"], name=r["name"], parentId=r["parent_id"])
+            for r in rows
+        ]
 
     if "curriculum" in visible:
         college_id = filters.college_id or scope.college_id
@@ -76,27 +74,23 @@ async def get_filter_options(
         professor_id = filters.professor_id
         if scope.role == "professor":
             rows = await db.fetch(
-                """
+                f"""
                 SELECT c.id, c.code, c.name, c.program_id
                 FROM courses c
-                JOIN staff_course_assignments sca
-                  ON sca.course_id = c.id AND sca.staff_person_id = $1
+                WHERE {professor_teaches_course_sql("c.id", 1)}
                 ORDER BY c.code
                 """,
                 scope.person_id,
             )
         elif college_id:
             rows = await db.fetch(
-                """
+                f"""
                 SELECT c.id, c.code, c.name, c.program_id
                 FROM courses c
                 WHERE c.program_id = $1
                   AND (
                     $2::text IS NULL
-                    OR EXISTS (
-                      SELECT 1 FROM staff_course_assignments sca
-                      WHERE sca.course_id = c.id AND sca.staff_person_id = $2
-                    )
+                    OR {professor_teaches_course_sql("c.id", 2)}
                   )
                 ORDER BY c.code
                 """,
@@ -105,17 +99,14 @@ async def get_filter_options(
             )
         elif sector_id and scope.role in ("senior_management", "it_academic_integrity"):
             rows = await db.fetch(
-                """
+                f"""
                 SELECT c.id, c.code, c.name, c.program_id
                 FROM courses c
                 JOIN org_units p ON p.id = c.program_id
                 WHERE p.parent_id = $1
                   AND (
                     $2::text IS NULL
-                    OR EXISTS (
-                      SELECT 1 FROM staff_course_assignments sca
-                      WHERE sca.course_id = c.id AND sca.staff_person_id = $2
-                    )
+                    OR {professor_teaches_course_sql("c.id", 2)}
                   )
                 ORDER BY c.code
                 """,
@@ -137,13 +128,27 @@ async def get_filter_options(
         rows = await db.fetch(
             """
             SELECT DISTINCT pe.id, pe.full_name AS name
-            FROM staff_course_assignments sca
-            JOIN people pe ON pe.id = sca.staff_person_id
-            JOIN courses c ON c.id = sca.course_id
-            JOIN org_units p ON p.id = c.program_id
-            WHERE ($1::text IS NULL OR p.parent_id = $1)
-              AND ($2::text IS NULL OR c.program_id = $2)
-              AND ($3::text IS NULL OR c.id = $3)
+            FROM (
+                SELECT sca.staff_person_id AS person_id,
+                       c.program_id,
+                       p.parent_id AS sector_id,
+                       c.id AS course_id
+                FROM staff_course_assignments sca
+                JOIN courses c ON c.id = sca.course_id
+                JOIN org_units p ON p.id = c.program_id
+                UNION
+                SELECT o.instructor_id,
+                       c.program_id,
+                       p.parent_id,
+                       c.id
+                FROM course_offerings o
+                JOIN courses c ON c.id = o.course_id
+                JOIN org_units p ON p.id = c.program_id
+            ) taught
+            JOIN people pe ON pe.id = taught.person_id
+            WHERE ($1::text IS NULL OR taught.sector_id = $1)
+              AND ($2::text IS NULL OR taught.program_id = $2)
+              AND ($3::text IS NULL OR taught.course_id = $3)
             ORDER BY pe.full_name
             """,
             sector_id,

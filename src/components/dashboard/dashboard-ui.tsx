@@ -83,17 +83,57 @@ export function StatBlock({
   );
 }
 
-export function AiInsight({ children }: { children: ReactNode }) {
+export function AiInsight({
+  children,
+  headline,
+  size = "md",
+}: {
+  children: ReactNode;
+  headline?: string;
+  size?: "md" | "lg";
+}) {
+  const large = size === "lg";
   return (
-    <div className="flex items-start gap-3 rounded-3xl border border-ai/25 bg-gradient-to-br from-violet/10 via-iris/5 to-cyan/10 p-5 backdrop-blur-xl">
-      <div className="font-display grid size-9 shrink-0 place-items-center rounded-xl bg-ai/15 text-ai font-extrabold">
+    <div
+      className={cn(
+        "flex items-start rounded-3xl border border-ai/25 bg-gradient-to-br from-violet/10 via-iris/5 to-cyan/10 backdrop-blur-xl",
+        large ? "gap-4 p-7 sm:min-h-44" : "gap-3 p-5",
+      )}
+    >
+      <div
+        className={cn(
+          "font-display grid shrink-0 place-items-center rounded-xl bg-ai/15 text-ai font-extrabold",
+          large ? "size-12 text-lg" : "size-9",
+        )}
+      >
         ✦
       </div>
-      <div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-ai">
+      <div className="min-w-0 flex-1">
+        <div
+          className={cn(
+            "font-bold uppercase tracking-[0.14em] text-ai",
+            large ? "text-[12px]" : "text-[11px]",
+          )}
+        >
           AI Insight
         </div>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-ink">
+        {headline ? (
+          <h3
+            className={cn(
+              "font-display mt-2 font-bold text-ink",
+              large ? "text-[18px]" : "text-[15px]",
+            )}
+          >
+            {headline}
+          </h3>
+        ) : null}
+        <p
+          className={cn(
+            "leading-relaxed text-ink",
+            headline ? "mt-2" : "mt-1.5",
+            large ? "text-[15px]" : "text-[13px]",
+          )}
+        >
           {children}
         </p>
       </div>
@@ -129,9 +169,11 @@ export function Badge({
 export function Meter({
   value,
   tone = "iris",
+  className,
 }: {
   value: number;
   tone?: "iris" | "cyan" | "mint" | "amber" | "rose";
+  className?: string;
 }) {
   const map = {
     iris: "bg-iris",
@@ -141,7 +183,9 @@ export function Meter({
     rose: "bg-rose",
   };
   return (
-    <div className="h-1.5 w-24 shrink-0 rounded-full bg-black/10">
+    <div
+      className={cn("h-1.5 w-24 shrink-0 rounded-full bg-black/10", className)}
+    >
       <div
         className={cn("h-full rounded-full", map[tone])}
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
@@ -150,10 +194,18 @@ export function Meter({
   );
 }
 
-export function TableShell({ children }: { children: ReactNode }) {
+export function TableShell({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-black/5">
-      <table className="w-full min-w-[640px] text-left text-[13px]">
+      <table
+        className={cn("w-full min-w-[640px] text-left text-[13px]", className)}
+      >
         {children}
       </table>
     </div>

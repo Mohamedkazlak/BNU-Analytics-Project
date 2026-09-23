@@ -176,7 +176,8 @@ def test_migration_015_exposes_section_on_exam_attempts_view():
     assert "drop table" not in sql
     repo = (ROOT / "backend" / "repositories" / "course_performance.py").read_text()
     assert "JOIN v_students" not in repo
-    assert "a.section" in repo
+    assert "c.name" in repo
+    assert "enrolled" in repo
 
 
 def test_migration_016_scales_ai_insights_attempt_lookups():

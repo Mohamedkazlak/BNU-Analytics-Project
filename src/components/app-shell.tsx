@@ -2,10 +2,15 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { ChatPanel } from "./chat-panel";
-import { navByRole, roleHome, useRole } from "./role-context";
+import { navByRole, useRole } from "./role-context";
 import type { UserAffiliation } from "@/lib/types";
 import { clearAuthToken } from "@/lib/auth/token";
-import { rolesAllowedForPath } from "@/lib/auth/role-guards";
+import {
+  ROLE_SLUG,
+  reportPath,
+  roleRouteTo,
+  rolesAllowedForPath,
+} from "@/lib/auth/role-guards";
 import { AnalyticsFilters } from "@/components/dashboard/analytics-filters";
 
 const BRAND_LOGO = "/brand-logo.png";
@@ -30,17 +35,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const groups = navByRole[role];
-  const allowed = rolesAllowedForPath(pathname);
-  const owner = allowed?.includes(role) ? role : allowed?.[0];
-  const current = (owner ? navByRole[owner] : groups)
+  const slug = ROLE_SLUG[role];
+  const report = reportPath(pathname);
+  const current = groups
     .flatMap((g) => g.items)
-    .find((item) => item.to === pathname);
+    .find((item) => (item.to === "/" ? report === "/" : item.to === report));
 
   // Deep-linking into another role's report sends the user to their own home.
   useEffect(() => {
     const allowed = rolesAllowedForPath(pathname);
     if (allowed && !allowed.includes(role)) {
-      void navigate({ to: roleHome[role] });
+      void navigate({
+        to: "/$role",
+        params: { role: ROLE_SLUG[role] },
+        search: {},
+      });
     }
   }, [navigate, pathname, role]);
 
@@ -70,11 +79,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {group.group}
               </div>
               {group.items.map((item) => {
-                const active = item.to === pathname;
+                const active =
+                  item.to === "/" ? report === "/" : item.to === report;
                 return (
                   <Link
                     key={item.to}
-                    to={item.to}
+                    to={roleRouteTo(item.to)}
+                    params={{ role: slug }}
+                    search={{}}
                     className={cn(
                       "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] transition-colors",
                       active
@@ -182,9 +194,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 flex flex-col gap-6">
             {role !== "student" ? <AnalyticsFilters /> : null}
-            {children}
+            <div key={pathname} className="flex flex-col gap-6">
+              {children}
+            </div>
           </div>
 
           <nav className="mt-8 flex flex-wrap gap-2 md:hidden">
@@ -193,7 +207,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               .map((item) => (
                 <Link
                   key={item.to}
-                  to={item.to}
+                  to={roleRouteTo(item.to)}
+                  params={{ role: slug }}
+                  search={{}}
                   className="rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[12px] font-medium text-ink-soft"
                 >
                   {item.label}

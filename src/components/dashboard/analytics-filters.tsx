@@ -133,10 +133,14 @@ export function AnalyticsFilters() {
   );
 }
 
-export function FiltersRequiredNotice() {
+export function FiltersRequiredNotice({
+  message = "Select the required filters to load analytics for that scope.",
+}: {
+  message?: string;
+}) {
   return (
     <div className="rounded-2xl border border-iris/20 bg-iris/8 px-4 py-3 text-[13px] text-ink-soft">
-      Select the required filters to load analytics for that scope.
+      {message}
     </div>
   );
 }

@@ -2,8 +2,9 @@ import { useRole } from "../role-context";
 import { useAnalyticsFilters } from "./use-analytics-filters";
 
 export function ScopeBanner() {
-  const { viewer } = useRole();
+  const { role, viewer } = useRole();
   const { options, filters } = useAnalyticsFilters();
+  if (role === "senior_management") return null;
   const sector = options?.sectors.find((s) => s.id === filters.sectorId)?.name;
   const college = options?.colleges.find(
     (c) => c.id === filters.collegeId,

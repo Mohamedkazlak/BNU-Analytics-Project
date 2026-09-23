@@ -7,6 +7,7 @@ import {
   HeadContent,
   Scripts,
   redirect,
+  stripSearchParams,
 } from "@tanstack/react-router";
 import { type ReactNode } from "react";
 
@@ -14,7 +15,12 @@ import appCss from "../styles.css?url";
 import { RoleProvider } from "@/components/role-context";
 import { AnalyticsFilterProvider } from "@/components/dashboard/analytics-filter-context";
 import { AppShell } from "@/components/app-shell";
-import { getActiveDemoRole } from "@/lib/auth/role-guards";
+import {
+  getActiveDemoRole,
+  legacyRedirectTo,
+  roleNavigateTarget,
+} from "@/lib/auth/role-guards";
+import { FILTER_SEARCH_DEFAULTS, fromSearchParams } from "@/lib/filter-types";
 
 function NotFoundComponent() {
   return (
@@ -29,7 +35,7 @@ function NotFoundComponent() {
         </p>
         <div className="mt-6">
           <Link
-            to="/management"
+            to="/"
             className="inline-flex items-center justify-center rounded-full bg-iris px-4 py-2 text-[12px] font-semibold text-white"
           >
             Back to overview
@@ -77,13 +83,23 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {
+    validateSearch: (search: Record<string, unknown>) =>
+      fromSearchParams(search),
+    search: {
+      middlewares: [stripSearchParams(FILTER_SEARCH_DEFAULTS)],
+    },
     beforeLoad: ({ location }) => {
       if (location.pathname === "/login") return;
       // localStorage is only available in the browser. Skip on SSR so a
       // successful login is not bounced back to /login during hydration.
       if (typeof window === "undefined") return;
-      if (!getActiveDemoRole()) {
+      const role = getActiveDemoRole();
+      if (!role) {
         throw redirect({ to: "/login" });
+      }
+      const dest = legacyRedirectTo(location.pathname, role);
+      if (dest) {
+        throw redirect({ ...roleNavigateTarget(dest), search: {} });
       }
     },
     head: () => ({

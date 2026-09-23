@@ -1,7 +1,7 @@
 import asyncpg
 
 from core.utils import PASS_MARK, round1
-from repositories.sql_filters import attempt_where
+from repositories.sql_filters import attempt_where, course_org_where
 from schemas.auth import UserContext
 from schemas.filters import AnalyticsFilters
 
@@ -18,11 +18,17 @@ async def get_course_performance(
     course_rows = await db.fetch(
         f"""
         SELECT
-            a.course_code AS course,
-            AVG(a.score)::float AS average
+            a.course_id,
+            a.course_code,
+            c.name AS course_name,
+            AVG(a.score)::float AS average,
+            COUNT(*) FILTER (WHERE a.score >= {PASS_MARK}) AS passed,
+            COUNT(*) AS scored
         FROM v_exam_attempts a
+        JOIN courses c ON c.id = a.course_id
         WHERE {participated}
-        GROUP BY a.course_code
+        GROUP BY a.course_id, a.course_code, c.name
+        ORDER BY c.name
         """,
         *args,
     )
@@ -31,43 +37,51 @@ async def get_course_performance(
             "averageByCourse": [],
             "sections": [],
             "assignedCourses": [],
-            "insight": "No section rows in this scope yet.",
+            "insight": "No course rows in this scope yet.",
         }
 
+    enroll_sql, enroll_args, _ = course_org_where(filters)
+    enroll_rows = await db.fetch(
+        f"""
+        SELECT
+            c.id AS course_id,
+            COUNT(e.id)::int AS enrolled
+        FROM courses c
+        JOIN org_units p ON p.id = c.program_id
+        JOIN course_offerings o ON o.course_id = c.id
+        JOIN enrollments e ON e.offering_id = o.id
+        WHERE {enroll_sql}
+        GROUP BY c.id
+        """,
+        *enroll_args,
+    )
+    enrolled_by_course = {r["course_id"]: r["enrolled"] for r in enroll_rows}
+
     average_by_course = []
+    sections = []
     for r in course_rows:
         mean = float(r["average"])
+        scored = r["scored"] or 0
+        pass_rate = (r["passed"] / scored * 100) if scored else 0
+        course_name = r["course_name"]
         average_by_course.append(
             {
-                "course": r["course"],
+                "course": course_name,
+                "courseCode": r["course_code"],
                 "average": round1(mean),
                 "quality": round(min(10, max(1, mean / 10 + 0.6)), 1),
             }
         )
-
-    section_rows = await db.fetch(
-        f"""
-        SELECT
-            a.course_code AS course,
-            a.section,
-            AVG(a.score)::float AS average,
-            COUNT(*) FILTER (WHERE a.score >= {PASS_MARK}) AS passed,
-            COUNT(*) AS total
-        FROM v_exam_attempts a
-        WHERE {participated}
-        GROUP BY a.course_code, a.section
-        """,
-        *args,
-    )
-    sections = [
-        {
-            "section": f"{r['course']} · {r['section']}",
-            "course": r["course"],
-            "average": round1(r["average"]),
-            "passRate": round1((r["passed"] / r["total"] * 100) if r["total"] else 0),
-        }
-        for r in section_rows
-    ]
+        sections.append(
+            {
+                "section": course_name,
+                "course": course_name,
+                "courseCode": r["course_code"],
+                "average": round1(mean),
+                "passRate": round1(pass_rate),
+                "enrolled": enrolled_by_course.get(r["course_id"], 0),
+            }
+        )
 
     assigned = []
     if ctx.role == "professor" and ctx.person_id:
@@ -110,9 +124,9 @@ async def get_course_performance(
 
     weakest = sorted(sections, key=lambda x: x["average"])[0] if sections else None
     insight = (
-        f"{weakest['section']} trails other sections in this scope."
+        f"{weakest['course']} trails other courses in this scope."
         if weakest
-        else "No section rows in this scope yet."
+        else "No course rows in this scope yet."
     )
 
     return {
